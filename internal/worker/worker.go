@@ -75,7 +75,9 @@ func (w *Worker) tick() {
 func (w *Worker) processEvent(event models.Event) {
 	switch e := event.(type) {
 	case models.EmailSentEvent:
-		w.sendEmail(e)
+		w.sendEmail(models.EmailSentEvent(e))
+	case models.ReminderEmailSentEvent:
+		w.sendEmail(models.EmailSentEvent(e))
 	case models.InvitationClosedEvent:
 		slog.Info("Invitation closed", "reason", e.Reason)
 	case models.SpotFilledEvent:

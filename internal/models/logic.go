@@ -15,6 +15,12 @@ type EmailSentEvent struct {
 	URL       string
 }
 
+type ReminderEmailSentEvent struct {
+	Recipient string
+	Subject   string
+	URL       string
+}
+
 type InvitationClosedEvent struct {
 	Reason string
 }
@@ -104,9 +110,36 @@ func (i *Invitation) Handle(cmd Command) []Event {
 		changed := false
 		for idx := range i.PersonalInvites {
 			invite := &i.PersonalInvites[idx]
-			if invite.Status == StatusPending && cmd.Now.After(invite.ExpiresAt) {
-				invite.Status = StatusTimedOut
-				changed = true
+			if invite.Status == StatusPending {
+				if cmd.Now.After(invite.ExpiresAt) {
+					invite.Status = StatusTimedOut
+					changed = true
+				} else if !invite.ReminderSent {
+					// Logic for reminder: check strategy to get duration
+					var duration time.Duration
+					if i.CurrentStrategyIndex < len(i.Strategies) {
+						strat := i.Strategies[i.CurrentStrategyIndex]
+						if strat.Type == StrategyPriorityList {
+							duration = strat.InviteDuration
+						} else {
+							duration = strat.TotalDuration
+						}
+					}
+
+					if duration > 0 {
+						startTime := invite.ExpiresAt.Add(-duration)
+						halfway := startTime.Add(duration / 2)
+						if cmd.Now.After(halfway) {
+							invite.ReminderSent = true
+							changed = true
+							events = append(events, ReminderEmailSentEvent{
+								Recipient: invite.ParticipantEmail,
+								Subject:   fmt.Sprintf("PÅMINNELSE: %s", i.Title),
+								URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, invite.ID),
+							})
+						}
+					}
+				}
 			}
 		}
 		if changed {

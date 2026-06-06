@@ -47,6 +47,7 @@ type PersonalInvite struct {
 	ParticipantEmail string               `json:"participant_email"`
 	Status           PersonalInviteStatus `json:"status"`
 	ExpiresAt        time.Time            `json:"expires_at"`
+	ReminderSent     bool                 `json:"reminder_sent"`
 }
 
 type Invitation struct {
