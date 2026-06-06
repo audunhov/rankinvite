@@ -55,6 +55,20 @@
         {{else}}
         <p>Ingen invitasjoner opprettet ennå.</p>
         {{end}}
+
+        {{if gt .TotalPages 1}}
+        <div style="margin-top: 30px; display: flex; justify-content: center; align-items: center; gap: 20px;">
+            {{if .HasPrev}}
+            <a href="/admin?page={{sub .Page 1}}" class="button">← FORRIGE</a>
+            {{end}}
+            
+            <span style="font-weight: bold; border: 3px solid black; padding: 12px 24px; background: white;">SIDE {{.Page}} AV {{.TotalPages}}</span>
+            
+            {{if .HasNext}}
+            <a href="/admin?page={{add .Page 1}}" class="button">NESTE →</a>
+            {{end}}
+        </div>
+        {{end}}
     </div>
 </body>
 </html>

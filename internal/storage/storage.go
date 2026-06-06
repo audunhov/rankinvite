@@ -46,8 +46,11 @@ func (r *InvitationRepository) GetByID(id uuid.UUID) (*models.Invitation, error)
 	return &inv, err
 }
 
-func (r *InvitationRepository) ListAll() ([]*models.Invitation, error) {
-	rows, err := r.queries.ListInvitations(context.Background())
+func (r *InvitationRepository) List(limit, offset int32) ([]*models.Invitation, error) {
+	rows, err := r.queries.ListInvitations(context.Background(), db.ListInvitationsParams{
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +64,10 @@ func (r *InvitationRepository) ListAll() ([]*models.Invitation, error) {
 		results = append(results, &inv)
 	}
 	return results, nil
+}
+
+func (r *InvitationRepository) Count() (int64, error) {
+	return r.queries.CountInvitations(context.Background())
 }
 
 func (r *InvitationRepository) Delete(id uuid.UUID) error {

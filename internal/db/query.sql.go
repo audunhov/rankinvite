@@ -21,6 +21,17 @@ func (q *Queries) AdminExists(ctx context.Context, username string) (int64, erro
 	return column_1, err
 }
 
+const countInvitations = `-- name: CountInvitations :one
+SELECT COUNT(*) FROM invitations
+`
+
+func (q *Queries) CountInvitations(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countInvitations)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAdmin = `-- name: CreateAdmin :exec
 INSERT INTO admins (id, username, password_hash)
 VALUES (?, ?, ?)
@@ -197,10 +208,17 @@ func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
 
 const listInvitations = `-- name: ListInvitations :many
 SELECT id, data FROM invitations
+ORDER BY rowid DESC
+LIMIT ? OFFSET ?
 `
 
-func (q *Queries) ListInvitations(ctx context.Context) ([]Invitation, error) {
-	rows, err := q.db.QueryContext(ctx, listInvitations)
+type ListInvitationsParams struct {
+	Limit  int64 `json:"limit"`
+	Offset int64 `json:"offset"`
+}
+
+func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams) ([]Invitation, error) {
+	rows, err := q.db.QueryContext(ctx, listInvitations, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

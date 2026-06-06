@@ -42,7 +42,7 @@ func (w *Worker) ProcessEvents(events []models.Event) {
 }
 
 func (w *Worker) tick() {
-	invs, err := w.repo.ListAll()
+	invs, err := w.repo.List(1000, 0)
 	if err != nil {
 		slog.Error("Worker failed to list invitations", "error", err)
 		return

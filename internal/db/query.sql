@@ -3,7 +3,12 @@ SELECT * FROM invitations
 WHERE id = ? LIMIT 1;
 
 -- name: ListInvitations :many
-SELECT * FROM invitations;
+SELECT * FROM invitations
+ORDER BY rowid DESC
+LIMIT ? OFFSET ?;
+
+-- name: CountInvitations :one
+SELECT COUNT(*) FROM invitations;
 
 -- name: SaveInvitation :exec
 INSERT INTO invitations (id, data) VALUES (?, ?)

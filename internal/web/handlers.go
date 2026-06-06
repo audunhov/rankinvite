@@ -35,7 +35,10 @@ type Server struct {
 }
 
 func NewServer(repo *storage.InvitationRepository, auth *auth.AuthService) *Server {
-	tmpl := template.New("")
+	tmpl := template.New("").Funcs(template.FuncMap{
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+	})
 	
 	// Strip "templates/" prefix from files in embedded FS
 	subFS, _ := fs.Sub(templateFS, "templates")
@@ -79,7 +82,6 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
 	mux.HandleFunc("/admin/invitations/delete", admin(s.handleDeleteInvitation))
 	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
-
 	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
 
 	mux.HandleFunc("/admin/users", admin(s.handleListUsers))
@@ -96,6 +98,10 @@ type PageData struct {
 	PastEmails  []string
 	Error       string
 	CSRFToken   string
+	Page        int
+	TotalPages  int
+	HasNext     bool
+	HasPrev     bool
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
@@ -172,15 +178,33 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	invs, err := s.repo.ListAll()
+	page := 1
+	if pStr := r.URL.Query().Get("page"); pStr != "" {
+		fmt.Sscanf(pStr, "%d", &page)
+	}
+	if page < 1 {
+		page = 1
+	}
+
+	pageSize := int32(10)
+	offset := int32(page-1) * pageSize
+
+	invs, err := s.repo.List(pageSize, offset)
 	if err != nil {
 		slog.Error("Failed to list invitations", "error", err)
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
 	}
 
+	total, _ := s.repo.Count()
+	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
+
 	s.render(w, r, "dashboard.html", PageData{
 		Invitations: invs,
+		Page:        page,
+		TotalPages:  totalPages,
+		HasNext:     page < totalPages,
+		HasPrev:     page > 1,
 	})
 }
 
@@ -229,7 +253,7 @@ func (s *Server) handlePersonalInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allInvs, err := s.repo.ListAll()
+	allInvs, err := s.repo.List(1000, 0) // Look in recent 1000 invitations
 	if err != nil {
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
@@ -268,7 +292,7 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	inviteID, _ := uuid.Parse(r.FormValue("invite_id"))
 	action := r.FormValue("action")
 
-	allInvs, _ := s.repo.ListAll()
+	allInvs, _ := s.repo.List(1000, 0)
 	var targetInv *models.Invitation
 	for _, inv := range allInvs {
 		for _, pi := range inv.PersonalInvites {
