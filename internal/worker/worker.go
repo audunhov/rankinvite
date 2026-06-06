@@ -109,12 +109,23 @@ func (w *Worker) notifyAdmins(subject, body string) {
 
 		from := "system@rankinvite.no"
 		to := []string{recipient}
-		msg := []byte(fmt.Sprintf("To: %s\r\n"+
-			"Subject: %s\r\n"+
-			"\r\n"+
-			"%s\r\n", recipient, subject, body))
+		
+		header := make(map[string]string)
+		header["From"] = from
+		header["To"] = recipient
+		header["Subject"] = subject
+		header["MIME-Version"] = "1.0"
+		header["Content-Type"] = "text/html; charset=\"utf-8\""
 
-		err := smtp.SendMail("localhost:1025", nil, from, to, msg)
+		htmlBody := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family: monospace; padding: 20px; border: 4px solid black;"><h1>RANKINVITE ALERT</h1><p>%s</p></body></html>`, body)
+
+		message := ""
+		for k, v := range header {
+			message += fmt.Sprintf("%s: %s\r\n", k, v)
+		}
+		message += "\r\n" + htmlBody
+
+		err := smtp.SendMail("localhost:1025", nil, from, to, []byte(message))
 		if err != nil {
 			slog.Warn("Failed to notify admin", "admin", recipient, "error", err)
 		} else {
@@ -130,12 +141,20 @@ func (w *Worker) sendEmail(e models.EmailSentEvent) {
 	from := "system@rankinvite.no"
 	to := []string{e.Recipient}
 
-	msg := []byte(fmt.Sprintf("To: %s\r\n"+
-		"Subject: %s\r\n"+
-		"\r\n"+
-		"%s\r\n", e.Recipient, e.Subject, e.Body))
+	header := make(map[string]string)
+	header["From"] = from
+	header["To"] = e.Recipient
+	header["Subject"] = e.Subject
+	header["MIME-Version"] = "1.0"
+	header["Content-Type"] = "text/html; charset=\"utf-8\""
 
-	err := smtp.SendMail("localhost:1025", nil, from, to, msg)
+	message := ""
+	for k, v := range header {
+		message += fmt.Sprintf("%s: %s\r\n", k, v)
+	}
+	message += "\r\n" + e.Body
+
+	err := smtp.SendMail("localhost:1025", nil, from, to, []byte(message))
 	if err != nil {
 		slog.Error("Failed to send email", "recipient", e.Recipient, "error", err)
 	} else {

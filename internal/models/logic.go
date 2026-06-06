@@ -9,28 +9,92 @@ import (
 	"github.com/google/uuid"
 )
 
+const emailWrapper = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { margin: 0; padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f0f0f0; }
+        .card { 
+            background-color: white; 
+            border: 4px solid black; 
+            padding: 40px; 
+            box-shadow: 12px 12px 0px 0px rgba(0,0,0,1); 
+            max-width: 600px; 
+            margin: 0 auto; 
+        }
+        h1 { font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px; }
+        p { font-size: 18px; line-height: 1.6; margin: 24px 0; }
+        .button { 
+            display: inline-block; 
+            background-color: #00ff00; 
+            color: black; 
+            text-decoration: none; 
+            padding: 20px 40px; 
+            font-weight: bold; 
+            border: 4px solid black; 
+            box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); 
+            text-transform: uppercase; 
+            font-size: 20px;
+        }
+        .footer { margin-top: 40px; font-size: 14px; text-transform: uppercase; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>RankInvite</h1>
+        <p>{{.Content}}</p>
+        <div style="margin: 40px 0;">
+            <a href="{{.URL}}" class="button">SVAR PÅ INVITASJON</a>
+        </div>
+        {{if .Location}}
+        <div style="border-top: 4px solid black; padding-top: 20px; margin-top: 40px;">
+            <strong>STED:</strong> {{.Location}}
+        </div>
+        {{end}}
+        <div class="footer">Sendt via RankInvite System</div>
+    </div>
+</body>
+</html>`
+
 func (i *Invitation) renderEmailBody(inviteID uuid.UUID, baseURL string) string {
+	content := ""
+	url := fmt.Sprintf("%s/i/%s", baseURL, inviteID)
+
 	if i.CustomEmailTemplate == "" {
-		return fmt.Sprintf("Hei! Du er herved invitert til %s. Klikk her for å svare: %s/i/%s", i.Title, baseURL, inviteID)
+		content = fmt.Sprintf("Hei! Du er herved invitert til %s.", i.Title)
+	} else {
+		tmpl, err := template.New("email").Parse(i.CustomEmailTemplate)
+		if err == nil {
+			var buf bytes.Buffer
+			data := struct {
+				Title    string
+				URL      string
+				Location string
+			}{
+				Title:    i.Title,
+				URL:      url,
+				Location: i.Location,
+			}
+			tmpl.Execute(&buf, data)
+			content = buf.String()
+		} else {
+			content = fmt.Sprintf("Hei! Du er herved invitert til %s. (Feil i mal: %v)", i.Title, err)
+		}
 	}
 
-	tmpl, err := template.New("email").Parse(i.CustomEmailTemplate)
-	if err != nil {
-		return fmt.Sprintf("Hei! Du er herved invitert til %s. Klikk her for å svare: %s/i/%s (Feil i mal: %v)", i.Title, baseURL, inviteID, err)
-	}
-
+	wrapperTmpl, _ := template.New("wrapper").Parse(emailWrapper)
 	var buf bytes.Buffer
-	data := struct {
-		Title    string
+	wrapperTmpl.Execute(&buf, struct {
+		Content  string
 		URL      string
 		Location string
 	}{
-		Title:    i.Title,
-		URL:      fmt.Sprintf("%s/i/%s", baseURL, inviteID),
+		Content:  content,
+		URL:      url,
 		Location: i.Location,
-	}
+	})
 
-	tmpl.Execute(&buf, data)
 	return buf.String()
 }
 
