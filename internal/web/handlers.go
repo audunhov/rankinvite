@@ -216,10 +216,7 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
-	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
-	s.render(w, r, "new_invitation.html", PageData{
-		DefaultEmailTemplate: defaultTemplate,
-	})
+	s.render(w, r, "new_invitation.html", PageData{})
 }
 
 func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
@@ -231,7 +228,6 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	title := r.FormValue("title")
 	location := r.FormValue("location")
 	description := r.FormValue("description")
-	emailTemplate := r.FormValue("email_template")
 	
 	var startTime time.Time
 	if stStr := r.FormValue("start_time"); stStr != "" {
@@ -241,11 +237,13 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	var spots int
 	fmt.Sscanf(r.FormValue("spots"), "%d", &spots)
 
+	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+
 	inv := models.NewInvitation(title, spots)
 	inv.Location = location
 	inv.Description = description
 	inv.StartTime = startTime
-	inv.CustomEmailTemplate = emailTemplate
+	inv.CustomEmailTemplate = defaultTemplate
 
 	err := s.repo.Save(inv)
 	if err != nil {
