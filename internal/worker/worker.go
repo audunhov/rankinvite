@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/smtp"
+	"rankinvite/internal/auth"
 	"rankinvite/internal/models"
 	"rankinvite/internal/storage"
 	"time"
@@ -11,11 +12,15 @@ import (
 
 type Worker struct {
 	repo    *storage.InvitationRepository
+	auth    *auth.AuthService
 	baseURL string
 }
 
-func NewWorker(repo *storage.InvitationRepository) *Worker {
-	return &Worker{repo: repo}
+func NewWorker(repo *storage.InvitationRepository, authService *auth.AuthService) *Worker {
+	return &Worker{
+		repo: repo,
+		auth: authService,
+	}
 }
 
 func (w *Worker) SetBaseURL(u string) {
@@ -82,18 +87,49 @@ func (w *Worker) processEvent(event models.Event) {
 		slog.Info("Invitation closed", "reason", e.Reason)
 	case models.SpotFilledEvent:
 		slog.Info("Spot filled", "email", e.ParticipantEmail, "remaining", e.RemainingSpots)
+		w.notifyAdmins(fmt.Sprintf("Plass fylt: %s", e.ParticipantEmail),
+			fmt.Sprintf("Brukeren %s har akseptert en plass. Det er %d plasser igjen.", e.ParticipantEmail, e.RemainingSpots))
 	default:
 		slog.Warn("Unknown event type encountered", "type", fmt.Sprintf("%T", event))
 	}
 }
 
+func (w *Worker) notifyAdmins(subject, body string) {
+	admins, err := w.auth.ListAdmins()
+	if err != nil {
+		slog.Error("Failed to list admins for notification", "error", err)
+		return
+	}
+
+	for _, admin := range admins {
+		recipient := admin.Username
+		if recipient == "" {
+			continue
+		}
+
+		from := "system@rankinvite.no"
+		to := []string{recipient}
+		msg := []byte(fmt.Sprintf("To: %s\r\n"+
+			"Subject: %s\r\n"+
+			"\r\n"+
+			"%s\r\n", recipient, subject, body))
+
+		err := smtp.SendMail("localhost:1025", nil, from, to, msg)
+		if err != nil {
+			slog.Warn("Failed to notify admin", "admin", recipient, "error", err)
+		} else {
+			slog.Info("Admin notified", "admin", recipient)
+		}
+	}
+}
+
 func (w *Worker) sendEmail(e models.EmailSentEvent) {
 	slog.Info("Attempting to send email", "recipient", e.Recipient, "subject", e.Subject)
-	
+
 	// MailHog default: localhost:1025
 	from := "system@rankinvite.no"
 	to := []string{e.Recipient}
-	
+
 	msg := []byte(fmt.Sprintf("To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"\r\n"+

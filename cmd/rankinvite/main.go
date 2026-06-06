@@ -75,7 +75,7 @@ func main() {
 	server.RegisterHandlers(mux)
 
 	// Initialize and Start Worker
-	workerInstance := worker.NewWorker(repo)
+	workerInstance := worker.NewWorker(repo, authService)
 	workerInstance.SetBaseURL(baseURL)
 	workerInstance.Start()
 	
