@@ -11,11 +11,11 @@ import (
 )
 
 const adminExists = `-- name: AdminExists :one
-SELECT EXISTS(SELECT 1 FROM admins WHERE username = ?)
+SELECT EXISTS(SELECT 1 FROM admins WHERE email = ?)
 `
 
-func (q *Queries) AdminExists(ctx context.Context, username string) (int64, error) {
-	row := q.db.QueryRowContext(ctx, adminExists, username)
+func (q *Queries) AdminExists(ctx context.Context, email string) (int64, error) {
+	row := q.db.QueryRowContext(ctx, adminExists, email)
 	var column_1 int64
 	err := row.Scan(&column_1)
 	return column_1, err
@@ -33,29 +33,29 @@ func (q *Queries) CountInvitations(ctx context.Context) (int64, error) {
 }
 
 const createAdmin = `-- name: CreateAdmin :exec
-INSERT INTO admins (id, username, password_hash)
+INSERT INTO admins (id, email, password_hash)
 VALUES (?, ?, ?)
 `
 
 type CreateAdminParams struct {
 	ID           string `json:"id"`
-	Username     string `json:"username"`
+	Email        string `json:"email"`
 	PasswordHash string `json:"password_hash"`
 }
 
 func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) error {
-	_, err := q.db.ExecContext(ctx, createAdmin, arg.ID, arg.Username, arg.PasswordHash)
+	_, err := q.db.ExecContext(ctx, createAdmin, arg.ID, arg.Email, arg.PasswordHash)
 	return err
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, username, csrf_token, expires_at)
+INSERT INTO sessions (id, email, csrf_token, expires_at)
 VALUES (?, ?, ?, ?)
 `
 
 type CreateSessionParams struct {
 	ID        string    `json:"id"`
-	Username  string    `json:"username"`
+	Email     string    `json:"email"`
 	CsrfToken string    `json:"csrf_token"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
@@ -63,7 +63,7 @@ type CreateSessionParams struct {
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
 	_, err := q.db.ExecContext(ctx, createSession,
 		arg.ID,
-		arg.Username,
+		arg.Email,
 		arg.CsrfToken,
 		arg.ExpiresAt,
 	)
@@ -111,14 +111,14 @@ func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 }
 
 const getAdmin = `-- name: GetAdmin :one
-SELECT id, username, password_hash FROM admins
-WHERE username = ? LIMIT 1
+SELECT id, email, password_hash FROM admins
+WHERE email = ? LIMIT 1
 `
 
-func (q *Queries) GetAdmin(ctx context.Context, username string) (Admin, error) {
-	row := q.db.QueryRowContext(ctx, getAdmin, username)
+func (q *Queries) GetAdmin(ctx context.Context, email string) (Admin, error) {
+	row := q.db.QueryRowContext(ctx, getAdmin, email)
 	var i Admin
-	err := row.Scan(&i.ID, &i.Username, &i.PasswordHash)
+	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
 	return i, err
 }
 
@@ -163,7 +163,7 @@ func (q *Queries) GetInvitation(ctx context.Context, id string) (Invitation, err
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, username, csrf_token, expires_at FROM sessions
+SELECT id, email, csrf_token, expires_at FROM sessions
 WHERE id = ? LIMIT 1
 `
 
@@ -172,7 +172,7 @@ func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 	var i Session
 	err := row.Scan(
 		&i.ID,
-		&i.Username,
+		&i.Email,
 		&i.CsrfToken,
 		&i.ExpiresAt,
 	)
@@ -180,7 +180,7 @@ func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 }
 
 const listAdmins = `-- name: ListAdmins :many
-SELECT id, username, password_hash FROM admins
+SELECT id, email, password_hash FROM admins
 `
 
 func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
@@ -192,7 +192,7 @@ func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
 	var items []Admin
 	for rows.Next() {
 		var i Admin
-		if err := rows.Scan(&i.ID, &i.Username, &i.PasswordHash); err != nil {
+		if err := rows.Scan(&i.ID, &i.Email, &i.PasswordHash); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

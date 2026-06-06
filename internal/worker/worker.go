@@ -102,7 +102,7 @@ func (w *Worker) notifyAdmins(subject, body string) {
 	}
 
 	for _, admin := range admins {
-		recipient := admin.Username
+		recipient := admin.Email
 		if recipient == "" {
 			continue
 		}

@@ -13,13 +13,13 @@ import (
 
 type AdminUser struct {
 	ID           uuid.UUID
-	Username     string
+	Email        string
 	PasswordHash string
 }
 
 type Session struct {
 	ID        string
-	Username  string
+	Email     string
 	CSRFToken string
 	ExpiresAt time.Time
 }
@@ -34,7 +34,7 @@ func NewAuthService(sqlDB *sql.DB) *AuthService {
 	}
 }
 
-func (s *AuthService) CreateAdmin(username, password string) error {
+func (s *AuthService) CreateAdmin(email, password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -42,19 +42,19 @@ func (s *AuthService) CreateAdmin(username, password string) error {
 
 	return s.queries.CreateAdmin(context.Background(), db.CreateAdminParams{
 		ID:           uuid.New().String(),
-		Username:     username,
+		Email:        email,
 		PasswordHash: string(hash),
 	})
 }
 
-func (s *AuthService) EnsureAdmin(username, password string) error {
-	exists, err := s.queries.AdminExists(context.Background(), username)
+func (s *AuthService) EnsureAdmin(email, password string) error {
+	exists, err := s.queries.AdminExists(context.Background(), email)
 	if err != nil {
 		return err
 	}
 
 	if exists == 0 {
-		return s.CreateAdmin(username, password)
+		return s.CreateAdmin(email, password)
 	}
 	return nil
 }
@@ -70,7 +70,7 @@ func (s *AuthService) ListAdmins() ([]AdminUser, error) {
 		id, _ := uuid.Parse(a.ID)
 		results[i] = AdminUser{
 			ID:           id,
-			Username:     a.Username,
+			Email:        a.Email,
 			PasswordHash: a.PasswordHash,
 		}
 	}
@@ -81,8 +81,8 @@ func (s *AuthService) DeleteAdmin(id string) error {
 	return s.queries.DeleteAdmin(context.Background(), id)
 }
 
-func (s *AuthService) VerifyAdmin(username, password string) (*AdminUser, error) {
-	admin, err := s.queries.GetAdmin(context.Background(), username)
+func (s *AuthService) VerifyAdmin(email, password string) (*AdminUser, error) {
+	admin, err := s.queries.GetAdmin(context.Background(), email)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -98,15 +98,15 @@ func (s *AuthService) VerifyAdmin(username, password string) (*AdminUser, error)
 	id, _ := uuid.Parse(admin.ID)
 	return &AdminUser{
 		ID:           id,
-		Username:     admin.Username,
+		Email:        admin.Email,
 		PasswordHash: admin.PasswordHash,
 	}, nil
 }
 
-func (s *AuthService) CreateSession(id, username, csrfToken string, expiresAt time.Time) error {
+func (s *AuthService) CreateSession(id, email, csrfToken string, expiresAt time.Time) error {
 	return s.queries.CreateSession(context.Background(), db.CreateSessionParams{
 		ID:        id,
-		Username:  username,
+		Email:     email,
 		CsrfToken: csrfToken,
 		ExpiresAt: expiresAt,
 	})
@@ -123,7 +123,7 @@ func (s *AuthService) GetSession(id string) (*Session, error) {
 	}
 	return &Session{
 		ID:        session.ID,
-		Username:  session.Username,
+		Email:     session.Email,
 		CSRFToken: session.CsrfToken,
 		ExpiresAt: session.ExpiresAt,
 	}, nil

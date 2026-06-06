@@ -10,7 +10,7 @@ import (
 
 type Admin struct {
 	ID           string `json:"id"`
-	Username     string `json:"username"`
+	Email        string `json:"email"`
 	PasswordHash string `json:"password_hash"`
 }
 
@@ -21,7 +21,7 @@ type Invitation struct {
 
 type Session struct {
 	ID        string    `json:"id"`
-	Username  string    `json:"username"`
+	Email     string    `json:"email"`
 	CsrfToken string    `json:"csrf_token"`
 	ExpiresAt time.Time `json:"expires_at"`
 }

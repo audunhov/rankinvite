@@ -10,8 +10,8 @@
             <h1>RankInvite Admin</h1>
             {{if .Error}}<p style="color: red; font-weight: bold;">{{.Error}}</p>{{end}}
             <form method="POST">
-                <label>Brukernavn</label>
-                <input type="text" name="username" required autofocus>
+                <label>E-post</label>
+                <input type="email" name="email" required autofocus>
                 <label>Passord</label>
                 <input type="password" name="password" required>
                 <button type="submit" class="button btn-primary" style="margin-top: 20px; width: 100%;">LOGG INN</button>

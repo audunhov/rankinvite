@@ -94,7 +94,7 @@ type PageData struct {
 	Invite      *models.PersonalInvite
 	Invitations []*models.Invitation
 	Admins      []auth.AdminUser
-	CurrentUser string
+	CurrentEmail string
 	PastEmails  []string
 	Error       string
 	CSRFToken   string
@@ -107,7 +107,7 @@ type PageData struct {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
 	if session, ok := r.Context().Value(sessionKey).(*auth.Session); ok {
 		data.CSRFToken = session.CSRFToken
-		data.CurrentUser = session.Username
+		data.CurrentEmail = session.Email
 	}
 	err := s.templates.ExecuteTemplate(w, name, data)
 	if err != nil {
@@ -121,17 +121,17 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.FormValue("username")
+	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	user, err := s.auth.VerifyAdmin(username, password)
+	user, err := s.auth.VerifyAdmin(email, password)
 	if err != nil || user == nil {
-		slog.Warn("Failed login attempt", "username", username, "error", err)
-		s.render(w, r, "login.html", PageData{Error: "Feil brukernavn eller passord"})
+		slog.Warn("Failed login attempt", "email", email, "error", err)
+		s.render(w, r, "login.html", PageData{Error: "Feil e-post eller passord"})
 		return
 	}
 
-	slog.Info("Successful login", "username", username)
+	slog.Info("Successful login", "email", email)
 
 	// Create persistent session
 	b := make([]byte, 32)
@@ -144,7 +144,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	csrfToken := base64.URLEncoding.EncodeToString(c)
 	
 	expiresAt := time.Now().Add(24 * time.Hour)
-	if err := s.auth.CreateSession(sessionID, username, csrfToken, expiresAt); err != nil {
+	if err := s.auth.CreateSession(sessionID, email, csrfToken, expiresAt); err != nil {
 		slog.Error("Failed to create session in database", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -540,16 +540,16 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	username := r.FormValue("username")
+	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	if err := s.auth.CreateAdmin(username, password); err != nil {
-		slog.Error("Failed to create admin", "username", username, "error", err)
+	if err := s.auth.CreateAdmin(email, password); err != nil {
+		slog.Error("Failed to create admin", "email", email, "error", err)
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("Admin user created", "username", username)
+	slog.Info("Admin user created", "email", email)
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
@@ -565,7 +565,7 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	// Check if trying to delete self
 	admins, _ := s.auth.ListAdmins()
 	for _, a := range admins {
-		if a.ID.String() == idStr && a.Username == session.Username {
+		if a.ID.String() == idStr && a.Email == session.Email {
 			http.Error(w, "Du kan ikke slette din egen bruker", http.StatusForbidden)
 			return
 		}
@@ -600,7 +600,7 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		slog.Debug("Admin access verified", "username", session.Username)
+		slog.Debug("Admin access verified", "email", session.Email)
 		
 		// Store session in context
 		ctx := r.Context()
@@ -620,7 +620,7 @@ func (s *Server) csrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 			token := r.FormValue("csrf_token")
 			if token == "" || token != session.CSRFToken {
-				slog.Warn("CSRF validation failed", "username", session.Username)
+				slog.Warn("CSRF validation failed", "email", session.Email)
 				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
 				return
 			}

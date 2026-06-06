@@ -20,13 +20,13 @@ WHERE id = ?;
 
 -- name: GetAdmin :one
 SELECT * FROM admins
-WHERE username = ? LIMIT 1;
+WHERE email = ? LIMIT 1;
 
 -- name: ListAdmins :many
 SELECT * FROM admins;
 
 -- name: CreateAdmin :exec
-INSERT INTO admins (id, username, password_hash)
+INSERT INTO admins (id, email, password_hash)
 VALUES (?, ?, ?);
 
 -- name: DeleteAdmin :exec
@@ -34,14 +34,14 @@ DELETE FROM admins
 WHERE id = ?;
 
 -- name: AdminExists :one
-SELECT EXISTS(SELECT 1 FROM admins WHERE username = ?);
+SELECT EXISTS(SELECT 1 FROM admins WHERE email = ?);
 
 -- name: GetAllParticipants :many
 SELECT DISTINCT json_extract(pi.value, '$.participant_email') as email
 FROM invitations, json_each(json_extract(invitations.data, '$.personal_invites')) as pi;
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, username, csrf_token, expires_at)
+INSERT INTO sessions (id, email, csrf_token, expires_at)
 VALUES (?, ?, ?, ?);
 
 -- name: GetSession :one
