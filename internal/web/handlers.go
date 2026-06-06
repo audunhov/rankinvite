@@ -84,25 +84,31 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/invitations/delete", admin(s.handleDeleteInvitation))
 	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
 	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
+	mux.HandleFunc("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
+	mux.HandleFunc("/admin/invitations/preview", admin(s.handlePreviewEmail))
 
 	mux.HandleFunc("/admin/users", admin(s.handleListUsers))
 	mux.HandleFunc("/admin/users/create", admin(s.handleCreateUser))
 	mux.HandleFunc("/admin/users/delete", admin(s.handleDeleteUser))
+
+	mux.HandleFunc("/admin/settings", admin(s.handleSettings))
+	mux.HandleFunc("/admin/settings/update", admin(s.handleUpdateSettings))
 }
 
 type PageData struct {
-	Invitation  *models.Invitation
-	Invite      *models.PersonalInvite
-	Invitations []*models.Invitation
-	Admins      []auth.AdminUser
-	CurrentEmail string
-	PastEmails  []string
-	Error       string
-	CSRFToken   string
-	Page        int
-	TotalPages  int
-	HasNext     bool
-	HasPrev     bool
+	Invitation           *models.Invitation
+	Invite               *models.PersonalInvite
+	Invitations          []*models.Invitation
+	Admins               []auth.AdminUser
+	CurrentEmail         string
+	PastEmails           []string
+	DefaultEmailTemplate string
+	Error                string
+	CSRFToken            string
+	Page                 int
+	TotalPages           int
+	HasNext              bool
+	HasPrev              bool
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
@@ -210,7 +216,10 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "new_invitation.html", PageData{})
+	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+	s.render(w, r, "new_invitation.html", PageData{
+		DefaultEmailTemplate: defaultTemplate,
+	})
 }
 
 func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
@@ -656,6 +665,61 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 		ctx = context.WithValue(ctx, sessionKey, session)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+func (s *Server) handleUpdateEmailTemplate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil || inv.Status != models.StatusDraft {
+		http.Error(w, "Invalid invitation state", http.StatusBadRequest)
+		return
+	}
+
+	inv.CustomEmailTemplate = r.FormValue("email_template")
+	s.repo.Save(inv)
+
+	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+}
+
+func (s *Server) handlePreviewEmail(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Use a dummy UUID for preview
+	dummyID := uuid.New()
+	html := inv.RenderEmailBody(dummyID, s.baseURL)
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
+}
+
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+	s.render(w, r, "settings.html", PageData{
+		DefaultEmailTemplate: defaultTemplate,
+	})
+}
+
+func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	template := r.FormValue("default_email_template")
+	s.repo.UpdateSetting("default_email_template", template)
+
+	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 }
 
 func (s *Server) csrfMiddleware(next http.HandlerFunc) http.HandlerFunc {

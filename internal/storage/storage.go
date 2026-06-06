@@ -90,3 +90,14 @@ func (r *InvitationRepository) GetUniqueEmails() ([]string, error) {
 	}
 	return emails, nil
 }
+
+func (r *InvitationRepository) GetSetting(key string) (string, error) {
+	return r.queries.GetSetting(context.Background(), key)
+}
+
+func (r *InvitationRepository) UpdateSetting(key, value string) error {
+	return r.queries.UpdateSetting(context.Background(), db.UpdateSettingParams{
+		Key:   key,
+		Value: value,
+	})
+}

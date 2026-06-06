@@ -179,6 +179,18 @@ func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 	return i, err
 }
 
+const getSetting = `-- name: GetSetting :one
+SELECT value FROM settings
+WHERE key = ? LIMIT 1
+`
+
+func (q *Queries) GetSetting(ctx context.Context, key string) (string, error) {
+	row := q.db.QueryRowContext(ctx, getSetting, key)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const listAdmins = `-- name: ListAdmins :many
 SELECT id, email, password_hash FROM admins
 `
@@ -252,5 +264,20 @@ type SaveInvitationParams struct {
 
 func (q *Queries) SaveInvitation(ctx context.Context, arg SaveInvitationParams) error {
 	_, err := q.db.ExecContext(ctx, saveInvitation, arg.ID, arg.Data)
+	return err
+}
+
+const updateSetting = `-- name: UpdateSetting :exec
+INSERT INTO settings (key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value
+`
+
+type UpdateSettingParams struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+func (q *Queries) UpdateSetting(ctx context.Context, arg UpdateSettingParams) error {
+	_, err := q.db.ExecContext(ctx, updateSetting, arg.Key, arg.Value)
 	return err
 }

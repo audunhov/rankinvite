@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Innstillinger - RankInvite</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <header style="justify-content: flex-start;">
+        <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
+    </header>
+
+    <h1>Innstillinger</h1>
+
+    <div class="card">
+        <h2>Standard e-postmal</h2>
+        <p style="margin-bottom: 20px; font-size: 0.9em;">Denne teksten fylles automatisk inn når du oppretter et nytt arrangement.</p>
+        
+        <form action="/admin/settings/update" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <div class="form-group">
+                <textarea name="default_email_template" rows="10">{{.DefaultEmailTemplate}}</textarea>
+                <p style="font-size: 0.8em; margin-top: 10px;">Bruk {{.Title}}, {{.URL}} og {{.Location}} som plassholdere.</p>
+            </div>
+            <button type="submit" class="button btn-primary">LAGRE INNSTILLINGER</button>
+        </form>
+    </div>
+</body>
+</html>

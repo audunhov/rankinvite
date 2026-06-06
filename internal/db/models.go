@@ -25,3 +25,8 @@ type Session struct {
 	CsrfToken string    `json:"csrf_token"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
+
+type Setting struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}

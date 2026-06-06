@@ -54,7 +54,7 @@ func main() {
 	authService := auth.NewAuthService(db)
 
 	// Ensure default admin
-	if err := authService.EnsureAdmin("admin", "admin"); err != nil {
+	if err := authService.EnsureAdmin("admin@rankinvite.no", "admin"); err != nil {
 		log.Fatalf("Failed to ensure default admin: %v", err)
 	}
 

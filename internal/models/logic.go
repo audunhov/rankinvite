@@ -57,7 +57,7 @@ const emailWrapper = `<!DOCTYPE html>
 </body>
 </html>`
 
-func (i *Invitation) renderEmailBody(inviteID uuid.UUID, baseURL string) string {
+func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string {
 	content := ""
 	url := fmt.Sprintf("%s/i/%s", baseURL, inviteID)
 
@@ -229,7 +229,7 @@ func (i *Invitation) Handle(cmd Command) []Event {
 								Recipient: invite.ParticipantEmail,
 								Subject:   fmt.Sprintf("PÅMINNELSE: %s", i.Title),
 								URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, invite.ID),
-								Body:      i.renderEmailBody(invite.ID, cmd.BaseURL),
+								Body:      i.RenderEmailBody(invite.ID, cmd.BaseURL),
 							})
 						}
 					}
@@ -321,7 +321,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 					Recipient: participant.Email,
 					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
 					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
-					Body:      i.renderEmailBody(inviteID, baseURL),
+					Body:      i.RenderEmailBody(inviteID, baseURL),
 				})
 				toInvite--
 			}
@@ -369,7 +369,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 					Recipient: participant.Email,
 					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
 					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
-					Body:      i.renderEmailBody(inviteID, baseURL),
+					Body:      i.RenderEmailBody(inviteID, baseURL),
 				})
 				sentAny = true
 			}

@@ -44,6 +44,14 @@ FROM invitations, json_each(json_extract(invitations.data, '$.personal_invites')
 INSERT INTO sessions (id, email, csrf_token, expires_at)
 VALUES (?, ?, ?, ?);
 
+-- name: GetSetting :one
+SELECT value FROM settings
+WHERE key = ? LIMIT 1;
+
+-- name: UpdateSetting :exec
+INSERT INTO settings (key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+
 -- name: GetSession :one
 SELECT * FROM sessions
 WHERE id = ? LIMIT 1;

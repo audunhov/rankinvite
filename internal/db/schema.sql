@@ -15,3 +15,8 @@ CREATE TABLE sessions (
     csrf_token TEXT NOT NULL,
     expires_at TIMESTAMP NOT NULL
 );
+
+CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
