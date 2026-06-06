@@ -8,3 +8,9 @@ CREATE TABLE admins (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL
 );
+
+CREATE TABLE sessions (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL,
+    expires_at TIMESTAMP NOT NULL
+);

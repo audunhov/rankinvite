@@ -4,6 +4,10 @@
 
 package db
 
+import (
+	"time"
+)
+
 type Admin struct {
 	ID           string `json:"id"`
 	Username     string `json:"username"`
@@ -13,4 +17,10 @@ type Admin struct {
 type Invitation struct {
 	ID   string `json:"id"`
 	Data string `json:"data"`
+}
+
+type Session struct {
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	ExpiresAt time.Time `json:"expires_at"`
 }

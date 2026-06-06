@@ -3,7 +3,9 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"rankinvite/internal/db"
+	"time"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
@@ -70,4 +72,28 @@ func (s *AuthService) VerifyAdmin(username, password string) (*AdminUser, error)
 		Username:     admin.Username,
 		PasswordHash: admin.PasswordHash,
 	}, nil
+}
+
+func (s *AuthService) CreateSession(id, username string, expiresAt time.Time) error {
+	return s.queries.CreateSession(context.Background(), db.CreateSessionParams{
+		ID:        id,
+		Username:  username,
+		ExpiresAt: expiresAt,
+	})
+}
+
+func (s *AuthService) GetSession(id string) (string, error) {
+	session, err := s.queries.GetSession(context.Background(), id)
+	if err != nil {
+		return "", err
+	}
+	if session.ExpiresAt.Before(time.Now()) {
+		s.queries.DeleteSession(context.Background(), id)
+		return "", fmt.Errorf("session expired")
+	}
+	return session.Username, nil
+}
+
+func (s *AuthService) DeleteSession(id string) error {
+	return s.queries.DeleteSession(context.Background(), id)
 }

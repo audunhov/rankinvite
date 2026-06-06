@@ -11,7 +11,6 @@ import (
 	"rankinvite/internal/auth"
 	"rankinvite/internal/models"
 	"rankinvite/internal/storage"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -26,7 +25,6 @@ type Server struct {
 	auth     *auth.AuthService
 	worker   EventProcessor
 	baseURL  string
-	sessions sync.Map // sessionID -> username
 }
 
 func NewServer(repo *storage.InvitationRepository, auth *auth.AuthService) *Server {
@@ -489,16 +487,23 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	slog.Info("Successful login", "username", username)
 
-	// Create session
+	// Create persistent session
 	b := make([]byte, 32)
 	rand.Read(b)
 	sessionID := base64.URLEncoding.EncodeToString(b)
-	s.sessions.Store(sessionID, username)
+	
+	expiresAt := time.Now().Add(24 * time.Hour)
+	if err := s.auth.CreateSession(sessionID, username, expiresAt); err != nil {
+		slog.Error("Failed to create session in database", "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
 		Value:    sessionID,
 		Path:     "/",
+		Expires:  expiresAt,
 		HttpOnly: true,
 		Secure:   false, // Set to true in production
 		SameSite: http.SameSiteLaxMode,
@@ -510,7 +515,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err == nil {
-		s.sessions.Delete(cookie.Value)
+		s.auth.DeleteSession(cookie.Value)
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name:    "session_id",
@@ -816,11 +821,14 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if _, ok := s.sessions.Load(cookie.Value); !ok {
+		username, err := s.auth.GetSession(cookie.Value)
+		if err != nil {
+			slog.Warn("Invalid or expired session", "session_id", cookie.Value, "error", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
+		slog.Debug("Admin access verified", "username", username)
 		next(w, r)
 	}
 }

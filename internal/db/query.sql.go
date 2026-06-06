@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const adminExists = `-- name: AdminExists :one
@@ -33,6 +34,42 @@ type CreateAdminParams struct {
 
 func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) error {
 	_, err := q.db.ExecContext(ctx, createAdmin, arg.ID, arg.Username, arg.PasswordHash)
+	return err
+}
+
+const createSession = `-- name: CreateSession :exec
+INSERT INTO sessions (id, username, expires_at)
+VALUES (?, ?, ?)
+`
+
+type CreateSessionParams struct {
+	ID        string    `json:"id"`
+	Username  string    `json:"username"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
+	_, err := q.db.ExecContext(ctx, createSession, arg.ID, arg.Username, arg.ExpiresAt)
+	return err
+}
+
+const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
+DELETE FROM sessions
+WHERE expires_at < ?
+`
+
+func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt time.Time) error {
+	_, err := q.db.ExecContext(ctx, deleteExpiredSessions, expiresAt)
+	return err
+}
+
+const deleteSession = `-- name: DeleteSession :exec
+DELETE FROM sessions
+WHERE id = ?
+`
+
+func (q *Queries) DeleteSession(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteSession, id)
 	return err
 }
 
@@ -85,6 +122,18 @@ func (q *Queries) GetInvitation(ctx context.Context, id string) (Invitation, err
 	row := q.db.QueryRowContext(ctx, getInvitation, id)
 	var i Invitation
 	err := row.Scan(&i.ID, &i.Data)
+	return i, err
+}
+
+const getSession = `-- name: GetSession :one
+SELECT id, username, expires_at FROM sessions
+WHERE id = ? LIMIT 1
+`
+
+func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
+	row := q.db.QueryRowContext(ctx, getSession, id)
+	var i Session
+	err := row.Scan(&i.ID, &i.Username, &i.ExpiresAt)
 	return i, err
 }
 
