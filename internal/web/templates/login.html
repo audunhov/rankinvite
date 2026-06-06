@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - RankInvite</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <main style="max-width: 500px; margin: 100px auto;">
+        <div class="card">
+            <h1>RankInvite Admin</h1>
+            {{if .Error}}<p style="color: red; font-weight: bold;">{{.Error}}</p>{{end}}
+            <form method="POST">
+                <label>Brukernavn</label>
+                <input type="text" name="username" required autofocus>
+                <label>Passord</label>
+                <input type="password" name="password" required>
+                <button type="submit" class="button btn-primary" style="margin-top: 20px; width: 100%;">LOGG INN</button>
+            </form>
+        </div>
+    </main>
+</body>
+</html>

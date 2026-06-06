@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.Invitation.Title}} - Admin</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <header style="justify-content: flex-start;">
+        <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
+    </header>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+        <h1>{{.Invitation.Title}}</h1>
+        <div>
+            {{if eq .Invitation.Status "draft"}}
+            <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                <button type="submit" name="action" value="start" class="button btn-success">START UTSENDELSE</button>
+            </form>
+            {{else if eq .Invitation.Status "active"}}
+            <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                <button type="submit" name="action" value="force_next" class="button btn-danger" onclick="return confirm('Sikker på at du vil avbryte nåværende ventetid og gå videre?')">HOPP OVER VENTENDE</button>
+            </form>
+            {{else}}
+            <span class="status-badge status-{{.Invitation.Status}}">{{.Invitation.Status}}</span>
+            {{end}}
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
+            <div>
+                <label>Sted</label>
+                <p>{{if .Invitation.Location}}{{.Invitation.Location}}{{else}}Ikke oppgitt{{end}}</p>
+            </div>
+            <div>
+                <label>Tidspunkt</label>
+                <p>{{if .Invitation.StartTime.IsZero}}Ikke oppgitt{{else}}{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}{{end}}</p>
+            </div>
+        </div>
+        <div>
+            <label>Beskrivelse</label>
+            <p>{{if .Invitation.Description}}{{.Invitation.Description}}{{else}}Ingen beskrivelse{{end}}</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>Fordelingsforløp</h2>
+            {{if eq .Invitation.Status "draft"}}
+            <a href="/admin/invitations/{{.Invitation.ID}}/strategies/new" class="button btn-primary">+ LEGG TIL STRATEGI</a>
+            {{end}}
+        </div>
+        
+        {{if .Invitation.Strategies}}
+            {{range $index, $strat := .Invitation.Strategies}}
+            <div style="border: 3px solid black; padding: 20px; margin-bottom: 20px; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); background: white;">
+                <div style="font-weight: bold; text-transform: uppercase; font-size: 0.8em; background: black; color: white; display: inline-block; padding: 4px 12px; margin-bottom: 15px;">{{$strat.Type}}</div>
+                <div>Deltakere: {{len $strat.Participants}}</div>
+                {{if eq $strat.Type "priority_list"}}
+                    <div>Frist per person: {{$strat.InviteDuration}}</div>
+                {{else}}
+                    <div>Total frist: {{$strat.TotalDuration}}</div>
+                {{end}}
+            </div>
+            {{end}}
+        {{else}}
+            <p>Ingen strategier er lagt til ennå.</p>
+        {{end}}
+    </div>
+
+    {{if ne .Invitation.Status "draft"}}
+    <div class="card" hx-get="/admin/invitations/status?id={{.Invitation.ID}}" hx-trigger="every 5s">
+        {{template "status_table" .}}
+    </div>
+    {{end}}
+</body>
+</html>
+
+{{define "status_table"}}
+<h2>Status på utsendelse</h2>
+<table class="table">
+    <thead>
+        <tr>
+            <th>E-post</th>
+            <th>Status</th>
+            <th>Utløper</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{range .Invitation.PersonalInvites}}
+        <tr>
+            <td>{{.ParticipantEmail}}</td>
+            <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+            <td>{{if .ExpiresAt.IsZero}}-{{else}}{{.ExpiresAt.Format "15:04:05"}}{{end}}</td>
+        </tr>
+        {{end}}
+    </tbody>
+</table>
+{{end}}

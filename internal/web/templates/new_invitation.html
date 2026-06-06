@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ny invitasjon - RankInvite</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <header style="justify-content: flex-start;">
+        <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
+    </header>
+
+    <h1>NY INVITASJON</h1>
+    <div class="card">
+        <form action="/admin/invitations" method="POST">
+            <div class="form-group">
+                <label>Tittel på arrangementet</label>
+                <input type="text" name="title" placeholder="f.eks. Debatt i NRK" required>
+            </div>
+
+            <div class="form-group">
+                <label>Sted</label>
+                <input type="text" name="location" placeholder="f.eks. Marienlyst">
+            </div>
+
+            <div class="form-group">
+                <label>Tidspunkt</label>
+                <input type="datetime-local" name="start_time">
+            </div>
+
+            <div class="form-group">
+                <label>Beskrivelse</label>
+                <textarea name="description" rows="5" placeholder="Mer detaljer om arrangementet..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label>Antall tilgjengelige plasser</label>
+                <input type="number" name="spots" value="1" min="1" required>
+            </div>
+            
+            <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 30px;">LAGRE UTKAST</button>
+        </form>
+    </div>
+</body>
+</html>

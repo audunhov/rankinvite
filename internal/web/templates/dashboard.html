@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard - RankInvite</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <header>
+        <strong>RANKINVITE ADMIN</strong>
+        <a href="/logout" class="button" style="padding: 8px 16px; font-size: 0.8em;">LOGG UT</a>
+    </header>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Dashboard</h1>
+        <a href="/admin/invitations/new" class="button btn-primary">+ NY INVITASJON</a>
+    </div>
+
+    <div class="card">
+        <h2>Dine invitasjoner</h2>
+        {{if .Invitations}}
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Tittel</th>
+                    <th>Plasser</th>
+                    <th>Status</th>
+                    <th>Opprettet</th>
+                    <th>Handling</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Invitations}}
+                <tr>
+                    <td><strong>{{.Title}}</strong></td>
+                    <td>{{.Spots}}</td>
+                    <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+                    <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                    <td><a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a></td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+        {{else}}
+        <p>Ingen invitasjoner opprettet ennå.</p>
+        {{end}}
+    </div>
+</body>
+</html>

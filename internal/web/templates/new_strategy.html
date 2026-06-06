@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Legg til strategi - Admin</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <header style="justify-content: flex-start;">
+        <a href="/admin/invitations/{{.Invitation.ID}}" class="back-link">← TILBAKE TIL INVITASJON</a>
+    </header>
+
+    <h1>Legg til strategi</h1>
+    <div class="card">
+        <form id="strategyForm" action="/admin/invitations/strategies" method="POST">
+            <input type="hidden" name="invitation_id" value="{{.Invitation.ID}}">
+            
+            <div class="form-group">
+                <label>Type strategi</label>
+                <select name="type" id="strategyType" onchange="toggleDuration()">
+                    <option value="priority_list">Prioritert liste</option>
+                    <option value="fcfs">Førstemann til mølla (FCFS)</option>
+                </select>
+            </div>
+
+            <div id="durationGroup" class="form-group">
+                <label id="durationLabel">Svarfrist per person (minutter)</label>
+                <input type="number" name="duration_mins" value="120">
+            </div>
+
+            <div class="form-group">
+                <label>Deltakere (dra og slipp for å prioritere)</label>
+                <div id="participantList" style="margin-bottom: 24px;">
+                    <!-- Participants will be added here -->
+                </div>
+                
+                <div style="display: flex; gap: 20px;">
+                    <input type="email" id="emailInput" list="pastEmails" placeholder="E-postadresse">
+                    <datalist id="pastEmails">
+                        {{range .PastEmails}}<option value="{{.}}">{{end}}
+                    </datalist>
+                    <button type="button" class="button" onclick="addParticipant()">LEGG TIL</button>
+                </div>
+            </div>
+
+            <input type="hidden" name="participants_json" id="participantsJson">
+            <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 40px; font-size: 1.2em;">LAGRE STRATEGI</button>
+        </form>
+    </div>
+
+    <script>
+        const participantList = document.getElementById('participantList');
+        const participants = [];
+
+        function addParticipant() {
+            const input = document.getElementById('emailInput');
+            const email = input.value.trim();
+            if (!email || participants.includes(email)) return;
+
+            participants.push(email);
+            renderList();
+            input.value = '';
+            input.focus();
+        }
+
+        function removeParticipant(email) {
+            const index = participants.indexOf(email);
+            if (index > -1) {
+                participants.splice(index, 1);
+                renderList();
+            }
+        }
+
+        function renderList() {
+            participantList.innerHTML = '';
+            participants.forEach((email, index) => {
+                const item = document.createElement('div');
+                item.className = 'participant-item';
+                item.draggable = true;
+                item.innerHTML = '<span style="margin-right: 15px; font-size: 1.2em;">☰</span>' +
+                                 '<span style="font-weight: bold;">' + email + '</span>' +
+                                 '<button type="button" class="remove-btn" onclick="removeParticipant(\'' + email + '\')">Fjern</button>';
+                
+                item.addEventListener('dragstart', () => item.classList.add('dragging'));
+                item.addEventListener('dragend', () => item.classList.remove('dragging'));
+                participantList.appendChild(item);
+            });
+            updateJson();
+        }
+
+        participantList.addEventListener('dragover', e => {
+            e.preventDefault();
+            const draggingItem = document.querySelector('.dragging');
+            const afterElement = getDragAfterElement(participantList, e.clientY);
+            if (afterElement == null) {
+                participantList.appendChild(draggingItem);
+            } else {
+                participantList.insertBefore(draggingItem, afterElement);
+            }
+        });
+
+        participantList.addEventListener('drop', e => {
+            const items = [...participantList.querySelectorAll('.participant-item')];
+            participants.length = 0;
+            items.forEach(item => {
+                participants.push(item.querySelector('span:nth-child(2)').innerText);
+            });
+            updateJson();
+        });
+
+        function getDragAfterElement(container, y) {
+            const draggableElements = [...container.querySelectorAll('.participant-item:not(.dragging)')];
+            return draggableElements.reduce((closest, child) => {
+                const box = child.getBoundingClientRect();
+                const offset = y - box.top - box.height / 2;
+                if (offset < 0 && offset > closest.offset) {
+                    return { offset: offset, element: child };
+                } else {
+                    return closest;
+                }
+            }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+
+        function updateJson() {
+            document.getElementById('participantsJson').value = JSON.stringify(participants);
+        }
+
+        function toggleDuration() {
+            const type = document.getElementById('strategyType').value;
+            const label = document.getElementById('durationLabel');
+            label.innerText = type === 'priority_list' ? 'Svarfrist per person (minutter)' : 'Total tidsfrist for runden (minutter)';
+        }
+
+        document.getElementById('emailInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addParticipant();
+            }
+        });
+    </script>
+</body>
+</html>
