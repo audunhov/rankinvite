@@ -35,17 +35,23 @@ type Server struct {
 }
 
 func NewServer(repo *storage.InvitationRepository, auth *auth.AuthService) *Server {
-	tmpl := template.New("").Funcs(template.FuncMap{
+	tmpl := template.New("base").Funcs(template.FuncMap{
 		"add": func(a, b int) int { return a + b },
 		"sub": func(a, b int) int { return a - b },
 	})
 	
 	// Strip "templates/" prefix from files in embedded FS
-	subFS, _ := fs.Sub(templateFS, "templates")
+	subFS, err := fs.Sub(templateFS, "templates")
+	if err != nil {
+		slog.Error("Failed to access embedded templates directory", "error", err)
+		return &Server{repo: repo, auth: auth, templates: tmpl}
+	}
 	
-	tmpl, err := tmpl.ParseFS(subFS, "*.html")
+	parsed, err := tmpl.ParseFS(subFS, "*.html")
 	if err != nil {
 		slog.Error("Failed to parse embedded templates", "error", err)
+	} else {
+		tmpl = parsed
 	}
 
 	return &Server{
