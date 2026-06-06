@@ -18,11 +18,21 @@
                 <input type="hidden" name="id" value="{{.Invitation.ID}}">
                 <button type="submit" name="action" value="start" class="button btn-success">START UTSENDELSE</button>
             </form>
+            <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                <button type="submit" name="action" value="cancel" class="button btn-danger" onclick="return confirm('Vil du slette dette utkastet?')">AVBRYT HELE</button>
+            </form>
             {{else if eq .Invitation.Status "active"}}
             <form action="/admin/invitations/action" method="POST" style="display: inline;">
                 <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
                 <input type="hidden" name="id" value="{{.Invitation.ID}}">
                 <button type="submit" name="action" value="force_next" class="button btn-danger" onclick="return confirm('Sikker på at du vil avbryte nåværende ventetid og gå videre?')">HOPP OVER VENTENDE</button>
+            </form>
+            <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                <button type="submit" name="action" value="cancel" class="button btn-danger" onclick="return confirm('Er du sikker på at du vil avbryte HELE prosessen? Alle lenker vil bli ugyldige.')" style="margin-left: 10px;">AVBRYT HELE</button>
             </form>
             {{else}}
             <span class="status-badge status-{{.Invitation.Status}}">{{.Invitation.Status}}</span>

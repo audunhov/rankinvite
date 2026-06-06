@@ -425,6 +425,12 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 			Now:     time.Now(),
 			BaseURL: s.baseURL,
 		})
+	} else if action == "cancel" {
+		events = inv.Handle(models.Command{
+			Type:    models.CmdCancel,
+			Now:     time.Now(),
+			BaseURL: s.baseURL,
+		})
 	}
 	
 	if err := s.repo.Save(inv); err != nil {

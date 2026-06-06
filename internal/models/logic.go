@@ -32,6 +32,7 @@ const (
 	CmdDecline CommandType = "decline"
 	CmdTick    CommandType = "tick"
 	CmdForceNext CommandType = "force_next"
+	CmdCancel  CommandType = "cancel"
 )
 
 type Command struct {
@@ -124,6 +125,15 @@ func (i *Invitation) Handle(cmd Command) []Event {
 		}
 		// Try to activate next steps
 		events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
+
+	case CmdCancel:
+		i.Status = StatusClosed
+		for idx := range i.PersonalInvites {
+			if i.PersonalInvites[idx].Status == StatusPending {
+				i.PersonalInvites[idx].Status = StatusTimedOut
+			}
+		}
+		events = append(events, InvitationClosedEvent{Reason: "Cancelled by administrator"})
 	}
 
 	return events
