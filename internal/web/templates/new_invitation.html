@@ -36,7 +36,7 @@
             <div class="form-group">
                 <label>E-postmal (valgfritt)</label>
                 <textarea name="email_template" rows="5" placeholder="Hei! Du er invitert til {{.Title}}. Svar her: {{.URL}}">{{.DefaultEmailTemplate}}</textarea>
-                <p style="font-size: 0.8em; margin-top: 5px;">Bruk {{.Title}}, {{.URL}} og {{.Location}} som plassholdere.</p>
+                {{template "variables_list" .}}
             </div>
             
             <div class="form-group">

@@ -66,6 +66,7 @@
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="id" value="{{.Invitation.ID}}">
             <textarea name="email_template" rows="8">{{.Invitation.CustomEmailTemplate}}</textarea>
+            {{template "variables_list" .}}
             <button type="submit" class="button btn-primary" style="margin-top: 20px;">OPPDATER MAL</button>
         </form>
         {{else}}

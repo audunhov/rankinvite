@@ -19,7 +19,7 @@
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <div class="form-group">
                 <textarea name="default_email_template" rows="10">{{.DefaultEmailTemplate}}</textarea>
-                <p style="font-size: 0.8em; margin-top: 10px;">Bruk {{.Title}}, {{.URL}} og {{.Location}} som plassholdere.</p>
+                {{template "variables_list" .}}
             </div>
             <button type="submit" class="button btn-primary">LAGRE INNSTILLINGER</button>
         </form>
