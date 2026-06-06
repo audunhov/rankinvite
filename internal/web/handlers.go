@@ -221,6 +221,7 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	title := r.FormValue("title")
 	location := r.FormValue("location")
 	description := r.FormValue("description")
+	emailTemplate := r.FormValue("email_template")
 	
 	var startTime time.Time
 	if stStr := r.FormValue("start_time"); stStr != "" {
@@ -234,6 +235,7 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.Location = location
 	inv.Description = description
 	inv.StartTime = startTime
+	inv.CustomEmailTemplate = emailTemplate
 
 	err := s.repo.Save(inv)
 	if err != nil {

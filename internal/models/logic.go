@@ -1,11 +1,38 @@
 package models
 
 import (
+	"bytes"
 	"fmt"
+	"text/template"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+func (i *Invitation) renderEmailBody(inviteID uuid.UUID, baseURL string) string {
+	if i.CustomEmailTemplate == "" {
+		return fmt.Sprintf("Hei! Du er herved invitert til %s. Klikk her for å svare: %s/i/%s", i.Title, baseURL, inviteID)
+	}
+
+	tmpl, err := template.New("email").Parse(i.CustomEmailTemplate)
+	if err != nil {
+		return fmt.Sprintf("Hei! Du er herved invitert til %s. Klikk her for å svare: %s/i/%s (Feil i mal: %v)", i.Title, baseURL, inviteID, err)
+	}
+
+	var buf bytes.Buffer
+	data := struct {
+		Title    string
+		URL      string
+		Location string
+	}{
+		Title:    i.Title,
+		URL:      fmt.Sprintf("%s/i/%s", baseURL, inviteID),
+		Location: i.Location,
+	}
+
+	tmpl.Execute(&buf, data)
+	return buf.String()
+}
 
 type Event interface{}
 
@@ -13,12 +40,14 @@ type EmailSentEvent struct {
 	Recipient string
 	Subject   string
 	URL       string
+	Body      string
 }
 
 type ReminderEmailSentEvent struct {
 	Recipient string
 	Subject   string
 	URL       string
+	Body      string
 }
 
 type InvitationClosedEvent struct {
@@ -33,12 +62,12 @@ type SpotFilledEvent struct {
 type CommandType string
 
 const (
-	CmdStart  CommandType = "start"
-	CmdAccept CommandType = "accept"
-	CmdDecline CommandType = "decline"
-	CmdTick    CommandType = "tick"
+	CmdStart     CommandType = "start"
+	CmdAccept    CommandType = "accept"
+	CmdDecline   CommandType = "decline"
+	CmdTick      CommandType = "tick"
 	CmdForceNext CommandType = "force_next"
-	CmdCancel  CommandType = "cancel"
+	CmdCancel    CommandType = "cancel"
 )
 
 type Command struct {
@@ -136,6 +165,7 @@ func (i *Invitation) Handle(cmd Command) []Event {
 								Recipient: invite.ParticipantEmail,
 								Subject:   fmt.Sprintf("PÅMINNELSE: %s", i.Title),
 								URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, invite.ID),
+								Body:      i.renderEmailBody(invite.ID, cmd.BaseURL),
 							})
 						}
 					}
@@ -227,6 +257,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 					Recipient: participant.Email,
 					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
 					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
+					Body:      i.renderEmailBody(inviteID, baseURL),
 				})
 				toInvite--
 			}
@@ -263,7 +294,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 				if strategy.TotalDuration == 0 {
 					expiresAt = now.Add(365 * 24 * time.Hour) // Default to long if not set
 				}
-				
+
 				i.PersonalInvites = append(i.PersonalInvites, PersonalInvite{
 					ID:               inviteID,
 					ParticipantEmail: participant.Email,
@@ -274,6 +305,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 					Recipient: participant.Email,
 					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
 					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
+					Body:      i.renderEmailBody(inviteID, baseURL),
 				})
 				sentAny = true
 			}

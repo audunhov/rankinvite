@@ -133,7 +133,7 @@ func (w *Worker) sendEmail(e models.EmailSentEvent) {
 	msg := []byte(fmt.Sprintf("To: %s\r\n"+
 		"Subject: %s\r\n"+
 		"\r\n"+
-		"Hei! Du er herved invitert. Klikk her for å svare: %s\r\n", e.Recipient, e.Subject, e.URL))
+		"%s\r\n", e.Recipient, e.Subject, e.Body))
 
 	err := smtp.SendMail("localhost:1025", nil, from, to, msg)
 	if err != nil {

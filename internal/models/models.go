@@ -56,6 +56,7 @@ type Invitation struct {
 	Location             string           `json:"location"`
 	StartTime            time.Time        `json:"start_time"`
 	Description          string           `json:"description"`
+	CustomEmailTemplate  string           `json:"custom_email_template"`
 	Spots                int              `json:"spots"`
 	Strategies           []Strategy       `json:"strategies"`
 	CurrentStrategyIndex int              `json:"current_strategy_index"`
