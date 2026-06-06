@@ -66,6 +66,7 @@ func (s *Server) SetBaseURL(u string) {
 func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/i/", s.handlePersonalInvite)
 	mux.HandleFunc("/i/action", s.handleInviteAction)
+	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
 	
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
@@ -283,6 +284,54 @@ func (s *Server) handlePersonalInvite(w http.ResponseWriter, r *http.Request) {
 		Invitation: foundInv,
 		Invite:     foundPersonalInvite,
 	})
+}
+
+func (s *Server) handleInviteCalendar(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Path[len("/i/calendar/"):]
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	allInvs, err := s.repo.List(1000, 0)
+	var foundInv *models.Invitation
+	for _, inv := range allInvs {
+		for _, pi := range inv.PersonalInvites {
+			if pi.ID == inviteID {
+				foundInv = inv
+				break
+			}
+		}
+	}
+
+	if foundInv == nil || foundInv.StartTime.IsZero() {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Generate ICS
+	start := foundInv.StartTime.UTC().Format("20060102T150405Z")
+	end := foundInv.StartTime.Add(time.Hour).UTC().Format("20060102T150405Z")
+	
+	ics := fmt.Sprintf("BEGIN:VCALENDAR\r\n"+
+		"VERSION:2.0\r\n"+
+		"PRODID:-//RankInvite//NONSGML v1.0//EN\r\n"+
+		"BEGIN:VEVENT\r\n"+
+		"UID:%s\r\n"+
+		"DTSTAMP:%s\r\n"+
+		"DTSTART:%s\r\n"+
+		"DTEND:%s\r\n"+
+		"SUMMARY:%s\r\n"+
+		"LOCATION:%s\r\n"+
+		"DESCRIPTION:%s\r\n"+
+		"END:VEVENT\r\n"+
+		"END:VCALENDAR\r\n",
+		inviteID, start, start, end, foundInv.Title, foundInv.Location, foundInv.Description)
+
+	w.Header().Set("Content-Type", "text/calendar")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", foundInv.Title))
+	w.Write([]byte(ics))
 }
 
 func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
