@@ -52,6 +52,9 @@ type PersonalInvite struct {
 type Invitation struct {
 	ID                   uuid.UUID        `json:"id"`
 	Title                string           `json:"title"`
+	Location             string           `json:"location"`
+	StartTime            time.Time        `json:"start_time"`
+	Description          string           `json:"description"`
 	Spots                int              `json:"spots"`
 	Strategies           []Strategy       `json:"strategies"`
 	CurrentStrategyIndex int              `json:"current_strategy_index"`

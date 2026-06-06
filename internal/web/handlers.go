@@ -209,6 +209,23 @@ const invitationDetailsTemplate = `
     </div>
 
     <div class="card">
+        <div style="display: grid; grid-template-cols: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <div>
+                <strong>STED</strong>
+                <p>{{if .Invitation.Location}}{{.Invitation.Location}}{{else}}Ikke oppgitt{{end}}</p>
+            </div>
+            <div>
+                <strong>TIDSPUNKT</strong>
+                <p>{{if .Invitation.StartTime.IsZero}}Ikke oppgitt{{else}}{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}{{end}}</p>
+            </div>
+        </div>
+        <div>
+            <strong>BESKRIVELSE</strong>
+            <p>{{if .Invitation.Description}}{{.Invitation.Description}}{{else}}Ingen beskrivelse{{end}}</p>
+        </div>
+    </div>
+
+    <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
             <h2>Fordelingsforløp</h2>
             {{if eq .Invitation.Status "draft"}}
@@ -416,6 +433,28 @@ const inviteTemplate = `
         <div class="card" style="text-align: center;">
             <h1 style="font-size: 3em; margin-bottom: 10px;">{{.Invitation.Title}}</h1>
             
+            <div style="display: flex; justify-content: center; gap: 40px; margin: 30px 0; border-top: 3px solid black; border-bottom: 3px solid black; padding: 20px 0;">
+                {{if .Invitation.Location}}
+                <div>
+                    <strong style="text-transform: uppercase; font-size: 0.8em;">Sted</strong>
+                    <div>{{.Invitation.Location}}</div>
+                </div>
+                {{end}}
+                {{if not .Invitation.StartTime.IsZero}}
+                <div>
+                    <strong style="text-transform: uppercase; font-size: 0.8em;">Når</strong>
+                    <div>{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}</div>
+                </div>
+                {{end}}
+            </div>
+
+            {{if .Invitation.Description}}
+            <div style="text-align: left; margin-bottom: 40px;">
+                <strong style="text-transform: uppercase; font-size: 0.8em;">Beskrivelse</strong>
+                <p>{{.Invitation.Description}}</p>
+            </div>
+            {{end}}
+
             {{if eq .Invite.Status "accepted"}}
                 <div style="background: #00ff00; padding: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; font-weight: bold; margin: 20px 0;">DU ER PÅMELDT! TAKK!</div>
             {{else if eq .Invite.Status "declined"}}
@@ -423,7 +462,7 @@ const inviteTemplate = `
             {{else if eq .Invite.Status "timed_out"}}
                 <div style="background: #ff0000; color: white; padding: 20px; border: 3px solid black; box-shadow: 4px 4px 0px black; font-weight: bold; margin: 20px 0;">DENNE INVITASJONEN ER IKKE LENGER GYLDIG.</div>
             {{else}}
-                <p style="font-size: 1.2em; margin: 30px 0;">Hei! Du er herved invitert. Det er <strong>{{.Invitation.Spots}}</strong> ledige plasser.</p>
+                <p style="font-size: 1.2em; margin: 30px 0;">Du er herved invitert. Det er <strong>{{.Invitation.Spots}}</strong> ledige plasser.</p>
                 
                 <form action="/i/action" method="POST" style="display: flex; flex-direction: column; gap: 20px;">
                     <input type="hidden" name="invite_id" value="{{.Invite.ID}}">
@@ -431,7 +470,7 @@ const inviteTemplate = `
                     <button type="submit" name="action" value="decline" class="button btn-danger" style="font-size: 1.2em; padding: 15px;">JEG KAN IKKE DELTA</button>
                 </form>
                 
-                <p style="margin-top: 30px; font-size: 0.9em; font-weight: bold; text-transform: uppercase;">Svarfrist: {{.Invite.ExpiresAt.Format "02.01.2006 kl. 15:04"}}</p>
+                <p style="margin-top: 30px; font-size: 0.9em; font-weight: bold; text-transform: uppercase;">Svarfrist på dette tilbudet: {{.Invite.ExpiresAt.Format "02.01.2006 kl. 15:04"}}</p>
             {{end}}
         </div>
     </main>
@@ -456,6 +495,15 @@ const newInvitationTemplate = `
         <form action="/admin/invitations" method="POST">
             <label>Tittel på arrangementet</label>
             <input type="text" name="title" placeholder="f.eks. Debatt i NRK" required>
+
+            <label style="margin-top: 20px; display: block;">Sted</label>
+            <input type="text" name="location" placeholder="f.eks. Marienlyst">
+
+            <label style="margin-top: 20px; display: block;">Tidspunkt</label>
+            <input type="datetime-local" name="start_time">
+
+            <label style="margin-top: 20px; display: block;">Beskrivelse</label>
+            <textarea name="description" rows="5" placeholder="Mer detaljer om arrangementet..."></textarea>
             
             <label style="margin-top: 20px; display: block;">Antall tilgjengelige plasser</label>
             <input type="number" name="spots" value="1" min="1" required>
@@ -551,12 +599,25 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	}
 
 	title := r.FormValue("title")
+	location := r.FormValue("location")
+	description := r.FormValue("description")
+	
+	var startTime time.Time
+	if stStr := r.FormValue("start_time"); stStr != "" {
+		startTime, _ = time.Parse("2006-01-02T15:04", stStr)
+	}
+
 	var spots int
 	fmt.Sscanf(r.FormValue("spots"), "%d", &spots)
 
 	inv := models.NewInvitation(title, spots)
+	inv.Location = location
+	inv.Description = description
+	inv.StartTime = startTime
+
 	err := s.repo.Save(inv)
 	if err != nil {
+		slog.Error("Failed to save new invitation", "error", err)
 		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
 		return
 	}
