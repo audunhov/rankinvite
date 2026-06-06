@@ -30,13 +30,22 @@
             </thead>
             <tbody>
                 {{range .Invitations}}
-                <tr>
-                    <td><strong>{{.Title}}</strong></td>
-                    <td>{{.Spots}}</td>
-                    <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
-                    <td>{{.CreatedAt.Format "02.01.2006"}}</td>
-                    <td><a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a></td>
-                </tr>
+                    <tr>
+                        <td><strong>{{.Title}}</strong></td>
+                        <td>{{.Spots}}</td>
+                        <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+                        <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                        <td style="display: flex; gap: 10px; align-items: center;">
+                            <a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a>
+                            {{if eq .Status "closed"}}
+                            <form action="/admin/invitations/delete" method="POST" style="margin: 0;">
+                                <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                                <input type="hidden" name="id" value="{{.ID}}">
+                                <button type="submit" class="button btn-danger" style="padding: 4px 12px; font-size: 0.7em;" onclick="return confirm('Er du helt sikker på at du vil slette all data for dette arrangementet?')">SLETT</button>
+                            </form>
+                            {{end}}
+                        </td>
+                    </tr>
                 {{end}}
             </tbody>
         </table>

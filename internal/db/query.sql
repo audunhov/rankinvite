@@ -9,6 +9,10 @@ SELECT * FROM invitations;
 INSERT INTO invitations (id, data) VALUES (?, ?)
 ON CONFLICT(id) DO UPDATE SET data = excluded.data;
 
+-- name: DeleteInvitation :exec
+DELETE FROM invitations
+WHERE id = ?;
+
 -- name: GetAdmin :one
 SELECT * FROM admins
 WHERE username = ? LIMIT 1;

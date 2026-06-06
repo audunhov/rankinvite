@@ -69,6 +69,16 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context, expiresAt time.Time
 	return err
 }
 
+const deleteInvitation = `-- name: DeleteInvitation :exec
+DELETE FROM invitations
+WHERE id = ?
+`
+
+func (q *Queries) DeleteInvitation(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteInvitation, id)
+	return err
+}
+
 const deleteSession = `-- name: DeleteSession :exec
 DELETE FROM sessions
 WHERE id = ?

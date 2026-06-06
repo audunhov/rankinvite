@@ -63,6 +63,10 @@ func (r *InvitationRepository) ListAll() ([]*models.Invitation, error) {
 	return results, nil
 }
 
+func (r *InvitationRepository) Delete(id uuid.UUID) error {
+	return r.queries.DeleteInvitation(context.Background(), id.String())
+}
+
 func (r *InvitationRepository) GetUniqueEmails() ([]string, error) {
 	rows, err := r.queries.GetAllParticipants(context.Background())
 	if err != nil {

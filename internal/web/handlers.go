@@ -77,7 +77,9 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/invitations", admin(s.handleCreateInvitation))
 	mux.HandleFunc("/admin/invitations/", admin(s.handleInvitationDetails))
 	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
+	mux.HandleFunc("/admin/invitations/delete", admin(s.handleDeleteInvitation))
 	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
+
 	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
 }
 
@@ -461,6 +463,29 @@ func (s *Server) handleInvitationStatusPartial(w http.ResponseWriter, r *http.Re
 	s.templates.ExecuteTemplate(w, "status_table", struct {
 		Invitation *models.Invitation
 	}{inv})
+}
+
+func (s *Server) handleDeleteInvitation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := s.repo.Delete(inviteID); err != nil {
+		slog.Error("Failed to delete invitation", "id", inviteID, "error", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("Invitation deleted", "id", inviteID)
+	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
 type contextKey string
