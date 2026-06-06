@@ -17,9 +17,16 @@ WHERE id = ?;
 SELECT * FROM admins
 WHERE username = ? LIMIT 1;
 
+-- name: ListAdmins :many
+SELECT * FROM admins;
+
 -- name: CreateAdmin :exec
 INSERT INTO admins (id, username, password_hash)
 VALUES (?, ?, ?);
+
+-- name: DeleteAdmin :exec
+DELETE FROM admins
+WHERE id = ?;
 
 -- name: AdminExists :one
 SELECT EXISTS(SELECT 1 FROM admins WHERE username = ?);

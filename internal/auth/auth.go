@@ -59,6 +59,28 @@ func (s *AuthService) EnsureAdmin(username, password string) error {
 	return nil
 }
 
+func (s *AuthService) ListAdmins() ([]AdminUser, error) {
+	admins, err := s.queries.ListAdmins(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	
+	results := make([]AdminUser, len(admins))
+	for i, a := range admins {
+		id, _ := uuid.Parse(a.ID)
+		results[i] = AdminUser{
+			ID:           id,
+			Username:     a.Username,
+			PasswordHash: a.PasswordHash,
+		}
+	}
+	return results, nil
+}
+
+func (s *AuthService) DeleteAdmin(id string) error {
+	return s.queries.DeleteAdmin(context.Background(), id)
+}
+
 func (s *AuthService) VerifyAdmin(username, password string) (*AdminUser, error) {
 	admin, err := s.queries.GetAdmin(context.Background(), username)
 	if err == sql.ErrNoRows {

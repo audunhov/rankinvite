@@ -59,6 +59,16 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) er
 	return err
 }
 
+const deleteAdmin = `-- name: DeleteAdmin :exec
+DELETE FROM admins
+WHERE id = ?
+`
+
+func (q *Queries) DeleteAdmin(ctx context.Context, id string) error {
+	_, err := q.db.ExecContext(ctx, deleteAdmin, id)
+	return err
+}
+
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
 DELETE FROM sessions
 WHERE expires_at < ?
@@ -156,6 +166,33 @@ func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 		&i.ExpiresAt,
 	)
 	return i, err
+}
+
+const listAdmins = `-- name: ListAdmins :many
+SELECT id, username, password_hash FROM admins
+`
+
+func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
+	rows, err := q.db.QueryContext(ctx, listAdmins)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Admin
+	for rows.Next() {
+		var i Admin
+		if err := rows.Scan(&i.ID, &i.Username, &i.PasswordHash); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listInvitations = `-- name: ListInvitations :many

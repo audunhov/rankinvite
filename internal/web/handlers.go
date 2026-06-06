@@ -81,12 +81,18 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
 
 	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
+
+	mux.HandleFunc("/admin/users", admin(s.handleListUsers))
+	mux.HandleFunc("/admin/users/create", admin(s.handleCreateUser))
+	mux.HandleFunc("/admin/users/delete", admin(s.handleDeleteUser))
 }
 
 type PageData struct {
 	Invitation  *models.Invitation
 	Invite      *models.PersonalInvite
 	Invitations []*models.Invitation
+	Admins      []auth.AdminUser
+	CurrentUser string
 	PastEmails  []string
 	Error       string
 	CSRFToken   string
@@ -95,6 +101,7 @@ type PageData struct {
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
 	if session, ok := r.Context().Value(sessionKey).(*auth.Session); ok {
 		data.CSRFToken = session.CSRFToken
+		data.CurrentUser = session.Username
 	}
 	err := s.templates.ExecuteTemplate(w, name, data)
 	if err != nil {
@@ -486,6 +493,66 @@ func (s *Server) handleDeleteInvitation(w http.ResponseWriter, r *http.Request) 
 
 	slog.Info("Invitation deleted", "id", inviteID)
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
+}
+
+func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
+	admins, err := s.auth.ListAdmins()
+	if err != nil {
+		slog.Error("Failed to list admins", "error", err)
+		http.Error(w, "Serverfeil", http.StatusInternalServerError)
+		return
+	}
+
+	s.render(w, r, "users.html", PageData{
+		Admins: admins,
+	})
+}
+
+func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	if err := s.auth.CreateAdmin(username, password); err != nil {
+		slog.Error("Failed to create admin", "username", username, "error", err)
+		http.Error(w, "Serverfeil", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("Admin user created", "username", username)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	session := r.Context().Value(sessionKey).(*auth.Session)
+
+	// Check if trying to delete self
+	admins, _ := s.auth.ListAdmins()
+	for _, a := range admins {
+		if a.ID.String() == idStr && a.Username == session.Username {
+			http.Error(w, "Du kan ikke slette din egen bruker", http.StatusForbidden)
+			return
+		}
+	}
+
+	if err := s.auth.DeleteAdmin(idStr); err != nil {
+		slog.Error("Failed to delete admin", "id", idStr, "error", err)
+		http.Error(w, "Serverfeil", http.StatusInternalServerError)
+		return
+	}
+
+	slog.Info("Admin user deleted", "id", idStr)
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
 type contextKey string
