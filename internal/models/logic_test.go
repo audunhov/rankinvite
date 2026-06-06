@@ -71,3 +71,89 @@ func TestDSTLateAcceptanceAfterTimeout(t *testing.T) {
 		t.Error("Should not produce events for late accept")
 	}
 }
+
+func TestDSTComplexChain(t *testing.T) {
+	// Setup: 2 spots, PriorityList(P1, P2) -> FCFS(P3, P4)
+	inv := NewInvitation("Big Event", 2)
+	p1 := Participant{Email: "p1@test.com"}
+	p2 := Participant{Email: "p2@test.com"}
+	p3 := Participant{Email: "p3@test.com"}
+	p4 := Participant{Email: "p4@test.com"}
+
+	inv.Strategies = append(inv.Strategies, Strategy{
+		Type:           StrategyPriorityList,
+		Participants:   []Participant{p1, p2},
+		InviteDuration: time.Hour,
+	})
+	inv.Strategies = append(inv.Strategies, Strategy{
+		Type:          StrategyFCFS,
+		Participants:  []Participant{p3, p4},
+		TotalDuration: 24 * time.Hour,
+	})
+
+	now := time.Unix(1000, 0)
+	// Start: P1 and P2 invited (since 2 spots available)
+	events := inv.Handle(Command{Type: CmdStart, Now: now})
+	if len(events) != 2 {
+		t.Errorf("Expected 2 initial invites, got %d", len(events))
+	}
+
+	// P1 accepts at t+10m
+	inv.Handle(Command{Type: CmdAccept, InviteID: inv.PersonalInvites[0].ID, Now: now.Add(10 * time.Minute)})
+	if inv.Spots != 1 {
+		t.Errorf("Expected 1 spot left, got %d", inv.Spots)
+	}
+
+	// P2 declines at t+20m -> should move to next strategy (FCFS) since P2 was the last in PriorityList
+	eventsDecline := inv.Handle(Command{Type: CmdDecline, InviteID: inv.PersonalInvites[1].ID, Now: now.Add(20 * time.Minute)})
+	
+	// Should have invited P3 and P4
+	if len(eventsDecline) != 2 {
+		t.Errorf("Expected 2 FCFS invites, got %d", len(eventsDecline))
+	}
+	if inv.CurrentStrategyIndex != 1 {
+		t.Errorf("Expected strategy index 1, got %d", inv.CurrentStrategyIndex)
+	}
+
+	// P3 accepts at t+30m -> 0 spots left, status closed
+	inv.Handle(Command{Type: CmdAccept, InviteID: inv.PersonalInvites[2].ID, Now: now.Add(30 * time.Minute)})
+	if inv.Spots != 0 || inv.Status != StatusClosed {
+		t.Errorf("Expected 0 spots and closed status, got %d and %s", inv.Spots, inv.Status)
+	}
+}
+
+func TestDSTForceNextChain(t *testing.T) {
+	inv := NewInvitation("Force Test", 1)
+	p1 := Participant{Email: "p1@test.com"}
+	p2 := Participant{Email: "p2@test.com"}
+
+	inv.Strategies = append(inv.Strategies, Strategy{
+		Type:           StrategyPriorityList,
+		Participants:   []Participant{p1},
+		InviteDuration: 24 * time.Hour,
+	})
+	inv.Strategies = append(inv.Strategies, Strategy{
+		Type:           StrategyPriorityList,
+		Participants:   []Participant{p2},
+		InviteDuration: 24 * time.Hour,
+	})
+
+	now := time.Unix(1000, 0)
+	inv.Handle(Command{Type: CmdStart, Now: now})
+	
+	if inv.PersonalInvites[0].ParticipantEmail != "p1@test.com" {
+		t.Error("P1 should be invited first")
+	}
+
+	// Force next -> skip P1, invite P2
+	eventsForce := inv.Handle(Command{Type: CmdForceNext, Now: now.Add(time.Minute)})
+	if len(eventsForce) != 1 {
+		t.Errorf("Expected 1 event for P2, got %d", len(eventsForce))
+	}
+	if inv.PersonalInvites[0].Status != StatusTimedOut {
+		t.Error("P1 should be timed out by force")
+	}
+	if inv.PersonalInvites[1].ParticipantEmail != "p2@test.com" {
+		t.Error("P2 should be invited next")
+	}
+}
