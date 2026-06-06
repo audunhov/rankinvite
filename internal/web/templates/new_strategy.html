@@ -12,6 +12,7 @@
     <h1>Legg til strategi</h1>
     <div class="card">
         <form id="strategyForm" action="/admin/invitations/strategies" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <input type="hidden" name="invitation_id" value="{{.Invitation.ID}}">
             
             <div class="form-group">

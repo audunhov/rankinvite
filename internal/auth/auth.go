@@ -17,6 +17,13 @@ type AdminUser struct {
 	PasswordHash string
 }
 
+type Session struct {
+	ID        string
+	Username  string
+	CSRFToken string
+	ExpiresAt time.Time
+}
+
 type AuthService struct {
 	queries *db.Queries
 }
@@ -74,24 +81,30 @@ func (s *AuthService) VerifyAdmin(username, password string) (*AdminUser, error)
 	}, nil
 }
 
-func (s *AuthService) CreateSession(id, username string, expiresAt time.Time) error {
+func (s *AuthService) CreateSession(id, username, csrfToken string, expiresAt time.Time) error {
 	return s.queries.CreateSession(context.Background(), db.CreateSessionParams{
 		ID:        id,
 		Username:  username,
+		CsrfToken: csrfToken,
 		ExpiresAt: expiresAt,
 	})
 }
 
-func (s *AuthService) GetSession(id string) (string, error) {
+func (s *AuthService) GetSession(id string) (*Session, error) {
 	session, err := s.queries.GetSession(context.Background(), id)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if session.ExpiresAt.Before(time.Now()) {
 		s.queries.DeleteSession(context.Background(), id)
-		return "", fmt.Errorf("session expired")
+		return nil, fmt.Errorf("session expired")
 	}
-	return session.Username, nil
+	return &Session{
+		ID:        session.ID,
+		Username:  session.Username,
+		CSRFToken: session.CsrfToken,
+		ExpiresAt: session.ExpiresAt,
+	}, nil
 }
 
 func (s *AuthService) DeleteSession(id string) error {

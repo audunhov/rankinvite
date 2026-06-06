@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"crypto/rand"
 	"embed"
 	"encoding/base64"
@@ -66,22 +67,42 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/login", s.handleLogin)
 	mux.HandleFunc("/logout", s.handleLogout)
 	
-	mux.HandleFunc("/admin", s.requireAdmin(s.handleAdminDashboard))
-	mux.HandleFunc("/admin/invitations/new", s.requireAdmin(s.handleNewInvitation))
-	mux.HandleFunc("/admin/invitations", s.requireAdmin(s.handleCreateInvitation))
-	mux.HandleFunc("/admin/invitations/", s.requireAdmin(s.handleInvitationDetails)) // This matches /admin/invitations/{id}
-	mux.HandleFunc("/admin/invitations/action", s.requireAdmin(s.handleAdminInvitationAction))
-	
-	// Add this for processing the strategy form
-	mux.HandleFunc("/admin/invitations/strategies", s.requireAdmin(s.handleCreateStrategy))
-	
-	// Add this for live status updates via HTMX
-	mux.HandleFunc("/admin/invitations/status", s.requireAdmin(s.handleInvitationStatusPartial))
+	// Protected Admin Routes
+	admin := func(h http.HandlerFunc) http.HandlerFunc {
+		return s.requireAdmin(s.csrfMiddleware(h))
+	}
+
+	mux.HandleFunc("/admin", admin(s.handleAdminDashboard))
+	mux.HandleFunc("/admin/invitations/new", admin(s.handleNewInvitation))
+	mux.HandleFunc("/admin/invitations", admin(s.handleCreateInvitation))
+	mux.HandleFunc("/admin/invitations/", admin(s.handleInvitationDetails))
+	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
+	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
+	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
+}
+
+type PageData struct {
+	Invitation  *models.Invitation
+	Invite      *models.PersonalInvite
+	Invitations []*models.Invitation
+	PastEmails  []string
+	Error       string
+	CSRFToken   string
+}
+
+func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
+	if session, ok := r.Context().Value(sessionKey).(*auth.Session); ok {
+		data.CSRFToken = session.CSRFToken
+	}
+	err := s.templates.ExecuteTemplate(w, name, data)
+	if err != nil {
+		slog.Error("Template error", "name", name, "error", err)
+	}
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		s.templates.ExecuteTemplate(w, "login.html", nil)
+		s.render(w, r, "login.html", PageData{})
 		return
 	}
 
@@ -91,7 +112,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	user, err := s.auth.VerifyAdmin(username, password)
 	if err != nil || user == nil {
 		slog.Warn("Failed login attempt", "username", username, "error", err)
-		s.templates.ExecuteTemplate(w, "login.html", struct{ Error string }{"Feil brukernavn eller passord"})
+		s.render(w, r, "login.html", PageData{Error: "Feil brukernavn eller passord"})
 		return
 	}
 
@@ -102,8 +123,13 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	rand.Read(b)
 	sessionID := base64.URLEncoding.EncodeToString(b)
 	
+	// Generate CSRF token
+	c := make([]byte, 32)
+	rand.Read(c)
+	csrfToken := base64.URLEncoding.EncodeToString(c)
+	
 	expiresAt := time.Now().Add(24 * time.Hour)
-	if err := s.auth.CreateSession(sessionID, username, expiresAt); err != nil {
+	if err := s.auth.CreateSession(sessionID, username, csrfToken, expiresAt); err != nil {
 		slog.Error("Failed to create session in database", "error", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
@@ -144,13 +170,13 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "dashboard.html", struct {
-		Invitations []*models.Invitation
-	}{invs})
+	s.render(w, r, "dashboard.html", PageData{
+		Invitations: invs,
+	})
 }
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
-	s.templates.ExecuteTemplate(w, "new_invitation.html", nil)
+	s.render(w, r, "new_invitation.html", PageData{})
 }
 
 func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
@@ -218,10 +244,10 @@ func (s *Server) handlePersonalInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "invite.html", struct {
-		Invitation *models.Invitation
-		Invite     *models.PersonalInvite
-	}{foundInv, foundPersonalInvite})
+	s.render(w, r, "invite.html", PageData{
+		Invitation: foundInv,
+		Invite:     foundPersonalInvite,
+	})
 }
 
 func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
@@ -302,9 +328,9 @@ func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "invitation_details.html", struct {
-		Invitation *models.Invitation
-	}{inv})
+	s.render(w, r, "invitation_details.html", PageData{
+		Invitation: inv,
+	})
 }
 
 func (s *Server) handleNewStrategy(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -312,10 +338,10 @@ func (s *Server) handleNewStrategy(w http.ResponseWriter, r *http.Request, idStr
 	inv, _ := s.repo.GetByID(inviteID)
 	pastEmails, _ := s.repo.GetUniqueEmails()
 
-	s.templates.ExecuteTemplate(w, "new_strategy.html", struct {
-		Invitation *models.Invitation
-		PastEmails []string
-	}{inv, pastEmails})
+	s.render(w, r, "new_strategy.html", PageData{
+		Invitation: inv,
+		PastEmails:  pastEmails,
+	})
 }
 
 func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
@@ -431,6 +457,10 @@ func (s *Server) handleInvitationStatusPartial(w http.ResponseWriter, r *http.Re
 	}{inv})
 }
 
+type contextKey string
+
+const sessionKey contextKey = "session"
+
 func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		cookie, err := r.Cookie("session_id")
@@ -439,14 +469,38 @@ func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		username, err := s.auth.GetSession(cookie.Value)
+		session, err := s.auth.GetSession(cookie.Value)
 		if err != nil {
 			slog.Warn("Invalid or expired session", "session_id", cookie.Value, "error", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		slog.Debug("Admin access verified", "username", username)
+		slog.Debug("Admin access verified", "username", session.Username)
+		
+		// Store session in context
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, sessionKey, session)
+		next(w, r.WithContext(ctx))
+	}
+}
+
+func (s *Server) csrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			session, ok := r.Context().Value(sessionKey).(*auth.Session)
+			if !ok {
+				next(w, r)
+				return
+			}
+
+			token := r.FormValue("csrf_token")
+			if token == "" || token != session.CSRFToken {
+				slog.Warn("CSRF validation failed", "username", session.Username)
+				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
+				return
+			}
+		}
 		next(w, r)
 	}
 }

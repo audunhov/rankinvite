@@ -14,11 +14,13 @@
         <div>
             {{if eq .Invitation.Status "draft"}}
             <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
                 <input type="hidden" name="id" value="{{.Invitation.ID}}">
                 <button type="submit" name="action" value="start" class="button btn-success">START UTSENDELSE</button>
             </form>
             {{else if eq .Invitation.Status "active"}}
             <form action="/admin/invitations/action" method="POST" style="display: inline;">
+                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
                 <input type="hidden" name="id" value="{{.Invitation.ID}}">
                 <button type="submit" name="action" value="force_next" class="button btn-danger" onclick="return confirm('Sikker på at du vil avbryte nåværende ventetid og gå videre?')">HOPP OVER VENTENDE</button>
             </form>

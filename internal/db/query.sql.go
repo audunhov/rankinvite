@@ -38,18 +38,24 @@ func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) error 
 }
 
 const createSession = `-- name: CreateSession :exec
-INSERT INTO sessions (id, username, expires_at)
-VALUES (?, ?, ?)
+INSERT INTO sessions (id, username, csrf_token, expires_at)
+VALUES (?, ?, ?, ?)
 `
 
 type CreateSessionParams struct {
 	ID        string    `json:"id"`
 	Username  string    `json:"username"`
+	CsrfToken string    `json:"csrf_token"`
 	ExpiresAt time.Time `json:"expires_at"`
 }
 
 func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) error {
-	_, err := q.db.ExecContext(ctx, createSession, arg.ID, arg.Username, arg.ExpiresAt)
+	_, err := q.db.ExecContext(ctx, createSession,
+		arg.ID,
+		arg.Username,
+		arg.CsrfToken,
+		arg.ExpiresAt,
+	)
 	return err
 }
 
@@ -126,14 +132,19 @@ func (q *Queries) GetInvitation(ctx context.Context, id string) (Invitation, err
 }
 
 const getSession = `-- name: GetSession :one
-SELECT id, username, expires_at FROM sessions
+SELECT id, username, csrf_token, expires_at FROM sessions
 WHERE id = ? LIMIT 1
 `
 
 func (q *Queries) GetSession(ctx context.Context, id string) (Session, error) {
 	row := q.db.QueryRowContext(ctx, getSession, id)
 	var i Session
-	err := row.Scan(&i.ID, &i.Username, &i.ExpiresAt)
+	err := row.Scan(
+		&i.ID,
+		&i.Username,
+		&i.CsrfToken,
+		&i.ExpiresAt,
+	)
 	return i, err
 }
 

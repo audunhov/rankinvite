@@ -25,8 +25,8 @@ SELECT DISTINCT json_extract(pi.value, '$.participant_email') as email
 FROM invitations, json_each(json_extract(invitations.data, '$.personal_invites')) as pi;
 
 -- name: CreateSession :exec
-INSERT INTO sessions (id, username, expires_at)
-VALUES (?, ?, ?);
+INSERT INTO sessions (id, username, csrf_token, expires_at)
+VALUES (?, ?, ?, ?);
 
 -- name: GetSession :one
 SELECT * FROM sessions

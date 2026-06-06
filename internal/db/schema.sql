@@ -12,5 +12,6 @@ CREATE TABLE admins (
 CREATE TABLE sessions (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL,
+    csrf_token TEXT NOT NULL,
     expires_at TIMESTAMP NOT NULL
 );

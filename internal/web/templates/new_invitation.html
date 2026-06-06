@@ -12,6 +12,7 @@
     <h1>NY INVITASJON</h1>
     <div class="card">
         <form action="/admin/invitations" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
             <div class="form-group">
                 <label>Tittel på arrangementet</label>
                 <input type="text" name="title" placeholder="f.eks. Debatt i NRK" required>
