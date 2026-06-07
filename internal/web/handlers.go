@@ -84,6 +84,8 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 
 	mux.HandleFunc("/admin", admin(s.handleAdminDashboard))
 	mux.HandleFunc("/admin/invitations/new", admin(s.handleNewInvitation))
+	mux.HandleFunc("/admin/invitations/edit", admin(s.handleEditInvitation))
+	mux.HandleFunc("/admin/invitations/update", admin(s.handleUpdateInvitation))
 	mux.HandleFunc("/admin/invitations", admin(s.handleCreateInvitation))
 	mux.HandleFunc("/admin/invitations/", admin(s.handleInvitationDetails))
 	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
@@ -254,6 +256,66 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
 	s.render(w, r, "new_invitation.html", PageData{})
+}
+
+func (s *Server) handleEditInvitation(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Query().Get("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	if inv.Status != models.StatusDraft {
+		s.setFlash(w, "Kan bare redigere utkast", "error")
+		http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+		return
+	}
+
+	s.render(w, r, "edit_invitation.html", PageData{Invitation: inv})
+}
+
+func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil || inv.Status != models.StatusDraft {
+		http.Error(w, "Ugyldig invitasjon", http.StatusBadRequest)
+		return
+	}
+
+	inv.Title = r.FormValue("title")
+	inv.Location = r.FormValue("location")
+	inv.Description = r.FormValue("description")
+	
+	if stStr := r.FormValue("start_time"); stStr != "" {
+		inv.StartTime, _ = time.Parse("2006-01-02T15:04", stStr)
+	} else {
+		inv.StartTime = time.Time{}
+	}
+	if etStr := r.FormValue("end_time"); etStr != "" {
+		inv.EndTime, _ = time.Parse("2006-01-02T15:04", etStr)
+	} else {
+		inv.EndTime = time.Time{}
+	}
+
+	fmt.Sscanf(r.FormValue("spots"), "%d", &inv.Spots)
+
+	err := s.repo.Save(inv)
+	if err != nil {
+		slog.Error("Failed to update invitation", "error", err)
+		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
+		return
+	}
+
+	s.setFlash(w, "Invitasjonen ble oppdatert!", "success")
+	http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s", inv.ID), http.StatusSeeOther)
 }
 
 func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) {
