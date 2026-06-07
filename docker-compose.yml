@@ -2,12 +2,11 @@ services:
   app:
     build: .
     ports:
-      - "${PORT:-8080}:8080"
+      - "8080:8080"
     volumes:
       - rankinvite_data:/app/data
     environment:
       - BASE_URL
-      - PORT
       - DATABASE_URL=/app/data/rankinvite.db
     restart: unless-stopped
 
