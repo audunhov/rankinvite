@@ -78,6 +78,18 @@ func (w *Worker) tick() {
 }
 
 func (w *Worker) processEvent(event models.Event, inv *models.Invitation) {
+	adminURL := fmt.Sprintf("%s/admin/invitations/%s", w.baseURL, inv.ID)
+	
+	details := ""
+	if inv != nil {
+		if inv.Location != "" {
+			details += "\n\nSTED: " + inv.Location
+		}
+		if !inv.StartTime.IsZero() {
+			details += "\nTID: " + inv.StartTime.Format("02.01.2006 kl. 15:04")
+		}
+	}
+
 	switch e := event.(type) {
 	case models.EmailSentEvent:
 		w.sendEmail(e, inv)
@@ -86,13 +98,15 @@ func (w *Worker) processEvent(event models.Event, inv *models.Invitation) {
 	case models.InvitationClosedEvent:
 		slog.Info("Invitation closed", "reason", e.Reason)
 	case models.InvitationFullyBookedEvent:
+		body := fmt.Sprintf("Alle plasser til arrangementet '%s' er nå fylt opp.%s", e.Title, details)
 		w.notifyAdmins(e.Subscribers, 
 			fmt.Sprintf("FULLBOOKET: %s", e.Title),
-			fmt.Sprintf("Alle plasser til arrangementet '%s' er nå fylt opp.", e.Title))
+			body, adminURL, "SE DETALJER I DASHBOARD")
 	case models.DistributionPlanCompletedEvent:
+		body := fmt.Sprintf("Alle deltakere i utsendelsesplanen for '%s' har blitt invitert og svarfristen har utløpt. Det er fortsatt %d plasser ledig.%s", e.Title, e.RemainingSpots, details)
 		w.notifyAdmins(e.Subscribers,
 			fmt.Sprintf("PLAN FULLFØRT: %s", e.Title),
-			fmt.Sprintf("Alle deltakere i utsendelsesplanen for '%s' har blitt invitert og svarfristen har utløpt. Det er fortsatt %d plasser ledig.", e.Title, e.RemainingSpots))
+			body, adminURL, "SE DETALJER I DASHBOARD")
 	case models.SpotFilledEvent:
 		slog.Info("Spot filled", "email", e.ParticipantEmail, "remaining", e.RemainingSpots)
 	default:
@@ -100,7 +114,7 @@ func (w *Worker) processEvent(event models.Event, inv *models.Invitation) {
 	}
 }
 
-func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
+func (w *Worker) notifyAdmins(subscribers []string, subject, body, url, buttonText string) {
 	if len(subscribers) == 0 {
 		return
 	}
@@ -111,7 +125,7 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 	smtpPass, _ := w.repo.GetSetting("smtp_pass")
 	globalSenderEmail, _ := w.repo.GetSetting("global_sender_email")
 
-	htmlBody := models.RenderGenericEmail("RANKINVITE VARSEL", body, "", "")
+	htmlBody := models.RenderGenericEmail("RANKINVITE VARSEL", body, url, buttonText)
 
 	for _, recipient := range subscribers {
 		from := globalSenderEmail
