@@ -9,6 +9,13 @@
         <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
     </header>
 
+    <div id="invitation-details-container">
+        {{template "invitation_details_content" .}}
+    </div>
+</body>
+</html>
+
+{{define "invitation_details_content"}}
     {{template "flash_messages" .}}
 
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
@@ -16,27 +23,26 @@
         <div>
             {{if eq .Invitation.Status "draft"}}
             <a href="/admin/invitations/edit?id={{.Invitation.ID}}" class="button" style="margin-right: 10px;">REDIGER</a>
-            <form action="/admin/invitations/action" method="POST" style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                <button type="submit" name="action" value="start" class="button btn-success">START UTSENDELSE</button>
-            </form>
-            <form action="/admin/invitations/action" method="POST" style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                <button type="submit" name="action" value="cancel" class="button btn-danger" onclick="return confirm('Vil du slette dette utkastet?')">AVBRYT HELE</button>
-            </form>
+            <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=start" 
+                    hx-target="#invitation-details-container"
+                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                    class="button btn-success">START UTSENDELSE</button>
+            <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=cancel" 
+                    hx-target="#invitation-details-container"
+                    hx-confirm="Vil du slette dette utkastet?"
+                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                    class="button btn-danger">AVBRYT HELE</button>
             {{else if eq .Invitation.Status "active"}}
-            <form action="/admin/invitations/action" method="POST" style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                <button type="submit" name="action" value="force_next" class="button btn-danger" onclick="return confirm('Sikker på at du vil avbryte nåværende ventetid og gå videre?')">HOPP OVER VENTENDE</button>
-            </form>
-            <form action="/admin/invitations/action" method="POST" style="display: inline;">
-                <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                <button type="submit" name="action" value="cancel" class="button btn-danger" onclick="return confirm('Er du sikker på at du vil avbryte HELE prosessen? Alle lenker vil bli ugyldige.')" style="margin-left: 10px;">AVBRYT HELE</button>
-            </form>
+            <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=force_next" 
+                    hx-target="#invitation-details-container"
+                    hx-confirm="Sikker på at du vil avbryte nåværende ventetid og gå videre?"
+                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                    class="button btn-danger">HOPP OVER VENTENDE</button>
+            <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=cancel" 
+                    hx-target="#invitation-details-container"
+                    hx-confirm="Er du sikker på at du vil avbryte HELE prosessen? Alle lenker vil bli ugyldige."
+                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                    class="button btn-danger" style="margin-left: 10px;">AVBRYT HELE</button>
             {{else}}
             <span class="status-badge status-{{.Invitation.Status}}">{{.Invitation.Status}}</span>
             {{end}}
@@ -73,17 +79,15 @@
                 </div>
                 <div>
                     {{if .IsSubscribed}}
-                    <form action="/admin/invitations/unsubscribe" method="POST" style="margin: 0;">
-                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                        <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                        <button type="submit" class="button" style="padding: 8px 16px; font-size: 0.8em; background: #eee;">AVSLUTT ABONNEMENT</button>
-                    </form>
+                    <button hx-post="/admin/invitations/unsubscribe?id={{.Invitation.ID}}" 
+                            hx-target="#invitation-details-container"
+                            hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                            class="button" style="padding: 8px 16px; font-size: 0.8em; background: #eee;">AVSLUTT ABONNEMENT</button>
                     {{else}}
-                    <form action="/admin/invitations/subscribe" method="POST" style="margin: 0;">
-                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                        <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                        <button type="submit" class="button btn-success" style="padding: 8px 16px; font-size: 0.8em;">FØLG DETTE ARRANGEMENTET</button>
-                    </form>
+                    <button hx-post="/admin/invitations/subscribe?id={{.Invitation.ID}}" 
+                            hx-target="#invitation-details-container"
+                            hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                            class="button btn-success" style="padding: 8px 16px; font-size: 0.8em;">FØLG DETTE ARRANGEMENTET</button>
                     {{end}}
                 </div>
             </div>
@@ -102,20 +106,34 @@
             {{range $index, $strat := .Invitation.Strategies}}
             <div style="border: 3px solid black; padding: 20px; margin-bottom: 20px; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); background: white; position: relative;">
                 {{if eq $.Invitation.Status "draft"}}
-                <form action="/admin/invitations/strategies/delete" method="POST" style="position: absolute; top: 10px; right: 10px; margin: 0;">
-                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                    <input type="hidden" name="id" value="{{$.Invitation.ID}}">
-                    <input type="hidden" name="index" value="{{$index}}">
-                    <button type="submit" class="remove-btn" onclick="return confirm('Slette denne strategien?')">SLETT</button>
-                </form>
+                <button hx-post="/admin/invitations/strategies/delete?id={{$.Invitation.ID}}&index={{$index}}" 
+                        hx-target="#invitation-details-container"
+                        hx-confirm="Slette denne strategien?"
+                        hx-vals='{"csrf_token": "{{$.CSRFToken}}"}'
+                        class="remove-btn" style="position: absolute; top: 10px; right: 10px;">SLETT</button>
                 {{end}}
                 <div style="font-weight: bold; text-transform: uppercase; font-size: 0.8em; background: black; color: white; display: inline-block; padding: 4px 12px; margin-bottom: 15px;">{{$strat.Type}}</div>
-                <div>Deltakere: {{len $strat.Participants}}</div>
-                {{if eq $strat.Type "priority_list"}}
-                    <div>Frist per person: {{$strat.InviteDuration}}</div>
-                {{else}}
-                    <div>Total frist: {{$strat.TotalDuration}}</div>
-                {{end}}
+                <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 20px;">
+                    <div>
+                        <div style="font-size: 0.9em; font-weight: bold;">INFO:</div>
+                        <div style="font-size: 0.8em; margin-top: 5px;">
+                            Deltakere: {{len $strat.Participants}}<br>
+                            {{if eq $strat.Type "priority_list"}}
+                                Frist per person: {{$strat.InviteDuration}}
+                            {{else}}
+                                Total frist: {{$strat.TotalDuration}}
+                            {{end}}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; font-weight: bold;">DELTAKERE:</div>
+                        <div style="font-size: 0.7em; margin-top: 5px; max-height: 100px; overflow-y: auto; background: #f9f9f9; padding: 10px; border: 1px solid #ddd;">
+                            {{range $strat.Participants}}
+                            <div style="margin-bottom: 2px;">• {{.Email}}</div>
+                            {{end}}
+                        </div>
+                    </div>
+                </div>
             </div>
             {{end}}
         {{else}}
@@ -147,27 +165,28 @@
         {{template "status_table" .}}
     </div>
     {{end}}
-</body>
-</html>
+{{end}}
 
 {{define "status_table"}}
 <h2>Status på utsendelse</h2>
-<table class="table">
-    <thead>
-        <tr>
-            <th>E-post</th>
-            <th>Status</th>
-            <th>Utløper</th>
-        </tr>
-    </thead>
-    <tbody>
-        {{range .Invitation.PersonalInvites}}
-        <tr>
-            <td>{{.ParticipantEmail}}</td>
-            <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
-            <td>{{if .ExpiresAt.IsZero}}-{{else}}{{.ExpiresAt.Format "15:04:05"}}{{end}}</td>
-        </tr>
-        {{end}}
-    </tbody>
-</table>
+<div class="table-container">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>E-post</th>
+                <th>Status</th>
+                <th>Utløper</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{range .Invitation.PersonalInvites}}
+            <tr>
+                <td>{{.ParticipantEmail}}</td>
+                <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+                <td>{{if .ExpiresAt.IsZero}}-{{else}}{{.ExpiresAt.Format "15:04:05"}}{{end}}</td>
+            </tr>
+            {{end}}
+        </tbody>
+    </table>
+</div>
 {{end}}

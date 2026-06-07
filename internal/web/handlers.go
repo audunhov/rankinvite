@@ -839,11 +839,18 @@ func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	s.render(w, r, "invitation_details.html", PageData{
+	data := PageData{
 		Invitation:   inv,
 		IsSubscribed: isSubscribed,
 		AdminName:    adminName,
-	})
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.templates.ExecuteTemplate(w, "invitation_details_content", data)
+		return
+	}
+
+	s.render(w, r, "invitation_details.html", data)
 }
 
 func (s *Server) handleNewStrategy(w http.ResponseWriter, r *http.Request, idStr string) {
@@ -1015,6 +1022,12 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 		slog.Debug("Dispatching admin events to worker", "id", inviteID, "count", len(events))
 		s.worker.ProcessEvents(events, inv)
 	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+		return
+	}
+
 	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
 }
 
