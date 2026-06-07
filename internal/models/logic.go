@@ -25,7 +25,7 @@ const emailWrapper = `<!DOCTYPE html>
             margin: 0 auto; 
         }
         h1 { font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px; }
-        .content { font-size: 18px; line-height: 1.6; margin: 24px 0; white-space: pre-wrap; }
+        .content { font-size: 18px; line-height: 1.6; margin: 24px 0; }
         .button { 
             display: inline-block; 
             background-color: #00ff00; 
@@ -84,8 +84,9 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 		}
 	}
 
-	// Convert newlines to HTML breaks for email clients that don't respect white-space: pre-wrap
-	content = strings.ReplaceAll(content, "\n", "<br>")
+	// Clean up newlines and convert to HTML breaks for maximum compatibility
+	replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
+	content = replacer.Replace(content)
 
 	wrapperTmpl, _ := template.New("wrapper").Parse(emailWrapper)
 	var buf bytes.Buffer
