@@ -31,15 +31,15 @@ DELETE FROM invitations
 WHERE id = ?;
 
 -- name: GetAdmin :one
-SELECT * FROM admins
+SELECT id, email, name, password_hash FROM admins
 WHERE email = ? LIMIT 1;
 
 -- name: ListAdmins :many
-SELECT * FROM admins;
+SELECT id, email, name, password_hash FROM admins;
 
 -- name: CreateAdmin :exec
-INSERT INTO admins (id, email, password_hash)
-VALUES (?, ?, ?);
+INSERT INTO admins (id, email, name, password_hash)
+VALUES (?, ?, ?, ?);
 
 -- name: DeleteAdmin :exec
 DELETE FROM admins

@@ -15,6 +15,7 @@ import (
 type AdminUser struct {
 	ID           uuid.UUID
 	Email        string
+	Name         string
 	PasswordHash string
 }
 
@@ -35,7 +36,7 @@ func NewAuthService(sqlDB *sql.DB) *AuthService {
 	}
 }
 
-func (s *AuthService) CreateAdmin(email, password string) error {
+func (s *AuthService) CreateAdmin(email, name, password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -44,18 +45,19 @@ func (s *AuthService) CreateAdmin(email, password string) error {
 	return s.queries.CreateAdmin(context.Background(), db.CreateAdminParams{
 		ID:           uuid.New().String(),
 		Email:        email,
+		Name:         name,
 		PasswordHash: string(hash),
 	})
 }
 
-func (s *AuthService) EnsureAdmin(email, password string) error {
+func (s *AuthService) EnsureAdmin(email, name, password string) error {
 	exists, err := s.queries.AdminExists(context.Background(), email)
 	if err != nil {
 		return err
 	}
 
 	if exists == 0 {
-		return s.CreateAdmin(email, password)
+		return s.CreateAdmin(email, name, password)
 	}
 	return nil
 }
@@ -75,6 +77,7 @@ func (s *AuthService) ListAdmins() ([]AdminUser, error) {
 		results[i] = AdminUser{
 			ID:           id,
 			Email:        a.Email,
+			Name:         a.Name,
 			PasswordHash: a.PasswordHash,
 		}
 	}
@@ -118,6 +121,7 @@ func (s *AuthService) VerifyAdmin(email, password string) (*AdminUser, error) {
 	return &AdminUser{
 		ID:           id,
 		Email:        admin.Email,
+		Name:         admin.Name,
 		PasswordHash: admin.PasswordHash,
 	}, nil
 }

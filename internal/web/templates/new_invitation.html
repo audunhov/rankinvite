@@ -9,13 +9,35 @@
         <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
     </header>
 
+    {{template "flash_messages" .}}
+
     <h1>NY INVITASJON</h1>
     <div class="card">
         <form action="/admin/invitations" method="POST">
             <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            
             <div class="form-group">
                 <label>Tittel på arrangementet</label>
-                <input type="text" name="title" placeholder="f.eks. Debatt i NRK" required>
+                <input type="text" name="title" placeholder="f.eks. Styremøte i Oslo" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label>Avsender</label>
+                <select name="sender" required>
+                    <optgroup label="Din personlige profil">
+                        <option value="me">{{.AdminName}} <{{.CurrentEmail}}></option>
+                    </optgroup>
+                    {{if .SharedSenders}}
+                    <optgroup label="Felles avsendere">
+                        {{range .SharedSendersList}}
+                        <option value="{{.}}">{{.}}</option>
+                        {{end}}
+                    </optgroup>
+                    {{end}}
+                    <optgroup label="System">
+                        <option value="system">{{.GlobalSenderName}} <{{.GlobalSenderEmail}}></option>
+                    </optgroup>
+                </select>
             </div>
 
             <div class="form-group">
@@ -44,7 +66,7 @@
                 <input type="number" name="spots" value="1" min="1" required>
             </div>
             
-            <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 30px;">LAGRE UTKAST</button>
+            <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 30px; font-size: 1.2em;">OPPRETT UTKAST</button>
         </form>
     </div>
 </body>

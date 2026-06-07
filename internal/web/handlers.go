@@ -24,7 +24,7 @@ import (
 var templateFS embed.FS
 
 type EventProcessor interface {
-	ProcessEvents([]models.Event)
+	ProcessEvents([]models.Event, *models.Invitation)
 }
 
 type Server struct {
@@ -115,6 +115,9 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/users/delete", admin(s.handleDeleteUser))
 	mux.HandleFunc("/admin/users/change-password", admin(s.handleChangePassword))
 
+	mux.HandleFunc("/admin/invitations/subscribe", admin(s.handleSubscribe))
+	mux.HandleFunc("/admin/invitations/unsubscribe", admin(s.handleUnsubscribe))
+
 	mux.HandleFunc("/admin/settings", admin(s.handleSettings))
 	mux.HandleFunc("/admin/settings/update", admin(s.handleUpdateSettings))
 	mux.HandleFunc("/admin/settings/preview", admin(s.handlePreviewDefaultTemplate))
@@ -128,6 +131,12 @@ type PageData struct {
 	CurrentEmail         string
 	PastEmails           []string
 	DefaultEmailTemplate string
+	GlobalSenderName     string
+	GlobalSenderEmail    string
+	SharedSenders        string
+	SharedSendersList    []string
+	AdminName            string
+	IsSubscribed         bool
 	Error                string
 	FlashMessage         string
 	FlashType            string // "success" or "error"
@@ -281,7 +290,34 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
-	s.render(w, r, "new_invitation.html", PageData{})
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	admins, _ := s.auth.ListAdmins()
+	adminName := ""
+	for _, a := range admins {
+		if a.Email == session.Email {
+			adminName = a.Name
+			break
+		}
+	}
+
+	globalName, _ := s.repo.GetSetting("global_sender_name")
+	globalEmail, _ := s.repo.GetSetting("global_sender_email")
+	sharedSenders, _ := s.repo.GetSetting("shared_senders")
+	
+	var sharedList []string
+	for _, line := range strings.Split(sharedSenders, "\n") {
+		if trimmed := strings.TrimSpace(line); trimmed != "" {
+			sharedList = append(sharedList, trimmed)
+		}
+	}
+
+	s.render(w, r, "new_invitation.html", PageData{
+		AdminName:         adminName,
+		GlobalSenderName:  globalName,
+		GlobalSenderEmail: globalEmail,
+		SharedSenders:     sharedSenders,
+		SharedSendersList: sharedList,
+	})
 }
 
 func (s *Server) handleEditInvitation(w http.ResponseWriter, r *http.Request) {
@@ -423,6 +459,34 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.StartTime = startTime
 	inv.EndTime = endTime
 	inv.CustomEmailTemplate = defaultTemplate
+
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	inv.CreatedBy = session.Email
+	inv.Subscribers = append(inv.Subscribers, session.Email)
+
+	// Process sender
+	senderValue := r.FormValue("sender")
+	if senderValue == "me" {
+		admins, _ := s.auth.ListAdmins()
+		for _, a := range admins {
+			if a.Email == session.Email {
+				inv.SenderName = a.Name
+				inv.SenderEmail = a.Email
+				break
+			}
+		}
+	} else if senderValue == "system" {
+		inv.SenderName, _ = s.repo.GetSetting("global_sender_name")
+		inv.SenderEmail, _ = s.repo.GetSetting("global_sender_email")
+	} else if senderValue != "" {
+		// Expects format "Name <email@domain.com>"
+		if idx := strings.Index(senderValue, "<"); idx != -1 && strings.HasSuffix(senderValue, ">") {
+			inv.SenderName = strings.TrimSpace(senderValue[:idx])
+			inv.SenderEmail = senderValue[idx+1 : len(senderValue)-1]
+		} else {
+			inv.SenderEmail = senderValue
+		}
+	}
 
 	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to save new invitation", "error", err)
@@ -571,7 +635,7 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	// Process side effects (emails)
 	if s.worker != nil {
 		slog.Debug("Dispatching events to worker", "id", targetInv.ID, "count", len(events))
-		s.worker.ProcessEvents(events)
+		s.worker.ProcessEvents(events, targetInv)
 	}
 
 	// Redirect back to see updated status
@@ -602,8 +666,28 @@ func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	isSubscribed := false
+	for _, sub := range inv.Subscribers {
+		if sub == session.Email {
+			isSubscribed = true
+			break
+		}
+	}
+
+	admins, _ := s.auth.ListAdmins()
+	adminName := ""
+	for _, a := range admins {
+		if a.Email == session.Email {
+			adminName = a.Name
+			break
+		}
+	}
+
 	s.render(w, r, "invitation_details.html", PageData{
-		Invitation: inv,
+		Invitation:   inv,
+		IsSubscribed: isSubscribed,
+		AdminName:    adminName,
 	})
 }
 
@@ -779,7 +863,7 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 
 	if s.worker != nil {
 		slog.Debug("Dispatching admin events to worker", "id", inviteID, "count", len(events))
-		s.worker.ProcessEvents(events)
+		s.worker.ProcessEvents(events, inv)
 	}
 	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
 }
@@ -846,6 +930,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	email := r.FormValue("email")
+	name := r.FormValue("name")
 	password := r.FormValue("password")
 
 	if email == "" || !strings.Contains(email, "@") {
@@ -859,7 +944,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := s.auth.CreateAdmin(email, password); err != nil {
+	if err := s.auth.CreateAdmin(email, name, password); err != nil {
 		slog.Error("Failed to create admin", "email", email, "error", err)
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
@@ -1009,9 +1094,76 @@ func (s *Server) handlePreviewEmail(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+	globalSenderName, _ := s.repo.GetSetting("global_sender_name")
+	globalSenderEmail, _ := s.repo.GetSetting("global_sender_email")
+	sharedSenders, _ := s.repo.GetSetting("shared_senders")
+
 	s.render(w, r, "settings.html", PageData{
 		DefaultEmailTemplate: defaultTemplate,
+		GlobalSenderName:     globalSenderName,
+		GlobalSenderEmail:    globalSenderEmail,
+		SharedSenders:        sharedSenders,
 	})
+}
+
+func (s *Server) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	newSubscribers := []string{}
+	for _, sub := range inv.Subscribers {
+		if sub != session.Email {
+			newSubscribers = append(newSubscribers, sub)
+		}
+	}
+	inv.Subscribers = newSubscribers
+	s.repo.Save(inv)
+
+	s.setFlash(w, "Du følger ikke lenger dette arrangementet", "success")
+	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+}
+
+func (s *Server) handleSubscribe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	alreadySubscribed := false
+	for _, sub := range inv.Subscribers {
+		if sub == session.Email {
+			alreadySubscribed = true
+			break
+		}
+	}
+
+	if !alreadySubscribed {
+		inv.Subscribers = append(inv.Subscribers, session.Email)
+		s.repo.Save(inv)
+	}
+
+	s.setFlash(w, "Du følger nå dette arrangementet!", "success")
+	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
 }
 
 func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
@@ -1020,8 +1172,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	template := r.FormValue("default_email_template")
-	s.repo.UpdateSetting("default_email_template", template)
+	s.repo.UpdateSetting("default_email_template", r.FormValue("default_email_template"))
+	s.repo.UpdateSetting("global_sender_name", r.FormValue("global_sender_name"))
+	s.repo.UpdateSetting("global_sender_email", r.FormValue("global_sender_email"))
+	s.repo.UpdateSetting("shared_senders", r.FormValue("shared_senders"))
 
 	s.setFlash(w, "Innstillingene ble lagret!", "success")
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)

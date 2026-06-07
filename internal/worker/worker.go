@@ -37,12 +37,12 @@ func (w *Worker) Start() {
 	}()
 }
 
-func (w *Worker) ProcessEvents(events []models.Event) {
+func (w *Worker) ProcessEvents(events []models.Event, inv *models.Invitation) {
 	if len(events) > 0 {
 		slog.Debug("Processing events", "count", len(events))
 	}
 	for _, event := range events {
-		w.processEvent(event)
+		w.processEvent(event, inv)
 	}
 }
 
@@ -72,41 +72,40 @@ func (w *Worker) tick() {
 				slog.Error("Failed to save invitation after tick", "id", inv.ID, "error", err)
 				continue
 			}
-			w.ProcessEvents(events)
+			w.ProcessEvents(events, inv)
 		}
 	}
 }
 
-func (w *Worker) processEvent(event models.Event) {
+func (w *Worker) processEvent(event models.Event, inv *models.Invitation) {
 	switch e := event.(type) {
 	case models.EmailSentEvent:
-		w.sendEmail(models.EmailSentEvent(e))
+		w.sendEmail(e, inv)
 	case models.ReminderEmailSentEvent:
-		w.sendEmail(models.EmailSentEvent(e))
+		w.sendEmail(models.EmailSentEvent(e), inv)
 	case models.InvitationClosedEvent:
 		slog.Info("Invitation closed", "reason", e.Reason)
+	case models.InvitationFullyBookedEvent:
+		w.notifyAdmins(e.Subscribers, 
+			fmt.Sprintf("FULLBOOKET: %s", e.Title),
+			fmt.Sprintf("Alle plasser til arrangementet '%s' er nå fylt opp.", e.Title))
+	case models.DistributionPlanCompletedEvent:
+		w.notifyAdmins(e.Subscribers,
+			fmt.Sprintf("PLAN FULLFØRT: %s", e.Title),
+			fmt.Sprintf("Alle deltakere i utsendelsesplanen for '%s' har blitt invitert og svarfristen har utløpt. Det er fortsatt %d plasser ledig.", e.Title, e.RemainingSpots))
 	case models.SpotFilledEvent:
 		slog.Info("Spot filled", "email", e.ParticipantEmail, "remaining", e.RemainingSpots)
-		w.notifyAdmins(fmt.Sprintf("Plass fylt: %s", e.ParticipantEmail),
-			fmt.Sprintf("Brukeren %s har akseptert en plass. Det er %d plasser igjen.", e.ParticipantEmail, e.RemainingSpots))
 	default:
 		slog.Warn("Unknown event type encountered", "type", fmt.Sprintf("%T", event))
 	}
 }
 
-func (w *Worker) notifyAdmins(subject, body string) {
-	admins, err := w.auth.ListAdmins()
-	if err != nil {
-		slog.Error("Failed to list admins for notification", "error", err)
+func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
+	if len(subscribers) == 0 {
 		return
 	}
 
-	for _, admin := range admins {
-		recipient := admin.Email
-		if recipient == "" {
-			continue
-		}
-
+	for _, recipient := range subscribers {
 		from := "system@rankinvite.no"
 		to := []string{recipient}
 		
@@ -117,7 +116,7 @@ func (w *Worker) notifyAdmins(subject, body string) {
 		header["MIME-Version"] = "1.0"
 		header["Content-Type"] = "text/html; charset=\"utf-8\""
 
-		htmlBody := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family: monospace; padding: 20px; border: 4px solid black;"><h1>RANKINVITE ALERT</h1><p>%s</p></body></html>`, body)
+		htmlBody := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family: monospace; padding: 20px; border: 4px solid black;"><h1>RANKINVITE VARSEL</h1><p>%s</p></body></html>`, body)
 
 		message := ""
 		for k, v := range header {
@@ -134,11 +133,19 @@ func (w *Worker) notifyAdmins(subject, body string) {
 	}
 }
 
-func (w *Worker) sendEmail(e models.EmailSentEvent) {
+func (w *Worker) sendEmail(e models.EmailSentEvent, inv *models.Invitation) {
 	slog.Info("Attempting to send email", "recipient", e.Recipient, "subject", e.Subject)
 
-	// MailHog default: localhost:1025
-	from := "system@rankinvite.no"
+	fromName := inv.SenderName
+	fromEmail := inv.SenderEmail
+
+	if fromEmail == "" {
+		// Fallback to global settings
+		fromName, _ = w.repo.GetSetting("global_sender_name")
+		fromEmail, _ = w.repo.GetSetting("global_sender_email")
+	}
+
+	from := fmt.Sprintf("%s <%s>", fromName, fromEmail)
 	to := []string{e.Recipient}
 
 	header := make(map[string]string)
@@ -154,7 +161,7 @@ func (w *Worker) sendEmail(e models.EmailSentEvent) {
 	}
 	message += "\r\n" + e.Body
 
-	err := smtp.SendMail("localhost:1025", nil, from, to, []byte(message))
+	err := smtp.SendMail("localhost:1025", nil, fromEmail, to, []byte(message))
 	if err != nil {
 		slog.Error("Failed to send email", "recipient", e.Recipient, "error", err)
 	} else {

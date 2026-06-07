@@ -51,18 +51,24 @@ func (q *Queries) CountInvitationsFiltered(ctx context.Context, arg CountInvitat
 }
 
 const createAdmin = `-- name: CreateAdmin :exec
-INSERT INTO admins (id, email, password_hash)
-VALUES (?, ?, ?)
+INSERT INTO admins (id, email, name, password_hash)
+VALUES (?, ?, ?, ?)
 `
 
 type CreateAdminParams struct {
 	ID           string `json:"id"`
 	Email        string `json:"email"`
+	Name         string `json:"name"`
 	PasswordHash string `json:"password_hash"`
 }
 
 func (q *Queries) CreateAdmin(ctx context.Context, arg CreateAdminParams) error {
-	_, err := q.db.ExecContext(ctx, createAdmin, arg.ID, arg.Email, arg.PasswordHash)
+	_, err := q.db.ExecContext(ctx, createAdmin,
+		arg.ID,
+		arg.Email,
+		arg.Name,
+		arg.PasswordHash,
+	)
 	return err
 }
 
@@ -129,14 +135,19 @@ func (q *Queries) DeleteSession(ctx context.Context, id string) error {
 }
 
 const getAdmin = `-- name: GetAdmin :one
-SELECT id, email, password_hash FROM admins
+SELECT id, email, name, password_hash FROM admins
 WHERE email = ? LIMIT 1
 `
 
 func (q *Queries) GetAdmin(ctx context.Context, email string) (Admin, error) {
 	row := q.db.QueryRowContext(ctx, getAdmin, email)
 	var i Admin
-	err := row.Scan(&i.ID, &i.Email, &i.PasswordHash)
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+	)
 	return i, err
 }
 
@@ -210,7 +221,7 @@ func (q *Queries) GetSetting(ctx context.Context, key string) (string, error) {
 }
 
 const listAdmins = `-- name: ListAdmins :many
-SELECT id, email, password_hash FROM admins
+SELECT id, email, name, password_hash FROM admins
 `
 
 func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
@@ -222,7 +233,12 @@ func (q *Queries) ListAdmins(ctx context.Context) ([]Admin, error) {
 	var items []Admin
 	for rows.Next() {
 		var i Admin
-		if err := rows.Scan(&i.ID, &i.Email, &i.PasswordHash); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Name,
+			&i.PasswordHash,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

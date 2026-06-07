@@ -59,6 +59,35 @@
         </div>
         <label>Beskrivelse</label>
         <p class="pre-wrap">{{if .Invitation.Description}}{{.Invitation.Description}}{{else}}Ingen beskrivelse{{end}}</p>
+
+        <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <label style="margin-bottom: 5px;">Abonnenter</label>
+                    <div style="font-size: 0.8em; color: #666;">Får e-postvarsler om dette arrangementet</div>
+                    <div style="margin-top: 10px;">
+                        {{range .Invitation.Subscribers}}
+                        <span style="display: inline-block; background: #eee; padding: 4px 10px; border: 1px solid black; font-size: 0.8em; margin-right: 5px; margin-bottom: 5px;">{{.}}</span>
+                        {{end}}
+                    </div>
+                </div>
+                <div>
+                    {{if .IsSubscribed}}
+                    <form action="/admin/invitations/unsubscribe" method="POST" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                        <button type="submit" class="button" style="padding: 8px 16px; font-size: 0.8em; background: #eee;">AVSLUTT ABONNEMENT</button>
+                    </form>
+                    {{else}}
+                    <form action="/admin/invitations/subscribe" method="POST" style="margin: 0;">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <input type="hidden" name="id" value="{{.Invitation.ID}}">
+                        <button type="submit" class="button btn-success" style="padding: 8px 16px; font-size: 0.8em;">FØLG DETTE ARRANGEMENTET</button>
+                    </form>
+                    {{end}}
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="card">

@@ -19,7 +19,7 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>E-post</th>
+                        <th>Navn / E-post</th>
                         <th>Handling</th>
                     </tr>
                 </thead>
@@ -27,7 +27,8 @@
                     {{range .Admins}}
                     <tr>
                         <td style="font-weight: bold;">
-                            {{.Email}}
+                            <div>{{.Name}}</div>
+                            <div style="font-size: 0.8em; font-weight: normal; color: #666;">{{.Email}}</div>
                             {{if eq .Email $.CurrentEmail}} <span style="font-size: 0.7em; background: #eee; padding: 2px 6px; border: 1px solid black;">DEG</span>{{end}}
                         </td>
                         <td>
@@ -52,8 +53,12 @@
             <form action="/admin/users/create" method="POST">
                 <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
                 <div class="form-group">
+                    <label>Navn</label>
+                    <input type="text" name="name" required placeholder="Fullt navn">
+                </div>
+                <div class="form-group">
                     <label>E-post</label>
-                    <input type="email" name="email" required>
+                    <input type="email" name="email" required placeholder="epost@eksempel.no">
                 </div>
                 <div class="form-group">
                     <label>Passord</label>

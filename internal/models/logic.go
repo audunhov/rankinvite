@@ -60,7 +60,6 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	var deadlineStr string
 	for _, pi := range i.PersonalInvites {
 		if pi.ID == inviteID && !pi.ExpiresAt.IsZero() {
-			deadlineStr = pi.ID.String() // Placeholder for testing if needed
 			// We use a safe default if it's the preview (where ID won't match)
 			deadlineStr = pi.ExpiresAt.Format("02.01.2006 15:04")
 			break
@@ -159,6 +158,19 @@ type InvitationClosedEvent struct {
 	Reason string
 }
 
+type InvitationFullyBookedEvent struct {
+	InvitationID uuid.UUID
+	Title        string
+	Subscribers  []string
+}
+
+type DistributionPlanCompletedEvent struct {
+	InvitationID   uuid.UUID
+	Title          string
+	Subscribers    []string
+	RemainingSpots int
+}
+
 type SpotFilledEvent struct {
 	ParticipantEmail string
 	RemainingSpots   int
@@ -167,36 +179,27 @@ type SpotFilledEvent struct {
 type CommandType string
 
 const (
-	CmdStart     CommandType = "start"
 	CmdAccept    CommandType = "accept"
+	CmdReject    CommandType = "reject"
 	CmdDecline   CommandType = "decline"
 	CmdTick      CommandType = "tick"
-	CmdForceNext CommandType = "force_next"
+	CmdStart     CommandType = "start"
 	CmdCancel    CommandType = "cancel"
+	CmdForceNext CommandType = "force_next"
 )
 
 type Command struct {
 	Type     CommandType
-	InviteID uuid.UUID // Only for Accept/Decline
+	InviteID uuid.UUID // Optional
 	Now      time.Time
-	BaseURL  string // e.g. "http://localhost:8080"
+	BaseURL  string
 }
 
 func (i *Invitation) Handle(cmd Command) []Event {
 	var events []Event
 
 	switch cmd.Type {
-	case CmdStart:
-		if i.Status == StatusDraft && len(i.Strategies) > 0 {
-			i.Status = StatusActive
-			i.CreatedAt = cmd.Now
-			events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
-		}
-
 	case CmdAccept:
-		if i.Status != StatusActive {
-			return events
-		}
 		for idx := range i.PersonalInvites {
 			invite := &i.PersonalInvites[idx]
 			if invite.ID == cmd.InviteID && invite.Status == StatusPending {
@@ -210,6 +213,11 @@ func (i *Invitation) Handle(cmd Command) []Event {
 
 					if i.Spots == 0 {
 						i.Status = StatusClosed
+						events = append(events, InvitationFullyBookedEvent{
+							InvitationID: i.ID,
+							Title:        i.Title,
+							Subscribers:  i.Subscribers,
+						})
 						events = append(events, InvitationClosedEvent{Reason: "All spots filled"})
 						// Invalidate others
 						for j := range i.PersonalInvites {
@@ -222,12 +230,13 @@ func (i *Invitation) Handle(cmd Command) []Event {
 					}
 				} else {
 					invite.Status = StatusTimedOut
+					events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
 				}
 				break
 			}
 		}
 
-	case CmdDecline:
+	case CmdReject, CmdDecline:
 		for idx := range i.PersonalInvites {
 			invite := &i.PersonalInvites[idx]
 			if invite.ID == cmd.InviteID && invite.Status == StatusPending {
@@ -237,60 +246,62 @@ func (i *Invitation) Handle(cmd Command) []Event {
 			}
 		}
 
-	case CmdTick:
-		if i.Status != StatusActive {
-			return events
-		}
-		changed := false
-		for idx := range i.PersonalInvites {
-			invite := &i.PersonalInvites[idx]
-			if invite.Status == StatusPending {
-				if cmd.Now.After(invite.ExpiresAt) {
-					invite.Status = StatusTimedOut
-					changed = true
-				} else if !invite.ReminderSent {
-					// Logic for reminder: check strategy to get duration
-					var duration time.Duration
-					if i.CurrentStrategyIndex < len(i.Strategies) {
-						strat := i.Strategies[i.CurrentStrategyIndex]
-						if strat.Type == StrategyPriorityList {
-							duration = strat.InviteDuration
-						} else {
-							duration = strat.TotalDuration
-						}
-					}
-
-					if duration > 0 {
-						startTime := invite.ExpiresAt.Add(-duration)
-						halfway := startTime.Add(duration / 2)
-						if cmd.Now.After(halfway) {
-							invite.ReminderSent = true
-							changed = true
-							events = append(events, ReminderEmailSentEvent{
-								Recipient: invite.ParticipantEmail,
-								Subject:   fmt.Sprintf("PÅMINNELSE: %s", i.Title),
-								URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, invite.ID),
-								Body:      i.RenderEmailBody(invite.ID, cmd.BaseURL),
-							})
-						}
-					}
-				}
-			}
-		}
-		if changed {
-			events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
-		}
-
 	case CmdForceNext:
 		if i.Status != StatusActive {
-			return events
+			return nil
 		}
-		// Force timeout all current pending invites
+		// Time out all currently pending invites
 		for idx := range i.PersonalInvites {
 			if i.PersonalInvites[idx].Status == StatusPending {
 				i.PersonalInvites[idx].Status = StatusTimedOut
 			}
 		}
+		// Move to next step
+		events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
+
+	case CmdTick:
+		if i.Status != StatusActive {
+			return nil
+		}
+		// Check for timeouts
+		changed := false
+		for idx := range i.PersonalInvites {
+			invite := &i.PersonalInvites[idx]
+			if invite.Status == StatusPending && cmd.Now.After(invite.ExpiresAt) {
+				invite.Status = StatusTimedOut
+				changed = true
+			}
+		}
+
+		// Check for reminders
+		for idx := range i.PersonalInvites {
+			invite := &i.PersonalInvites[idx]
+			if invite.Status == StatusPending && !invite.ReminderSent {
+				// Send reminder if less than 50% time left
+				// This is a simple logic, could be more complex
+				remaining := invite.ExpiresAt.Sub(cmd.Now)
+				// For now: reminder if 30 mins left
+				if remaining < 30*time.Minute {
+					invite.ReminderSent = true
+					events = append(events, ReminderEmailSentEvent{
+						Recipient: invite.ParticipantEmail,
+						Subject:   "PÅMINNELSE: Invitasjon til " + i.Title,
+						URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, invite.ID),
+						Body:      i.RenderEmailBody(invite.ID, cmd.BaseURL),
+					})
+				}
+			}
+		}
+
+		if changed {
+			events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
+		}
+
+	case CmdStart:
+		if i.Status != StatusDraft {
+			return nil
+		}
+		i.Status = StatusActive
 		// Try to activate next steps
 		events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
 
@@ -315,8 +326,25 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 	}
 
 	if i.CurrentStrategyIndex >= len(i.Strategies) {
-		i.Status = StatusClosed
-		events = append(events, InvitationClosedEvent{Reason: "All strategies exhausted"})
+		// Check if any invites are still pending
+		anyPending := false
+		for _, pi := range i.PersonalInvites {
+			if pi.Status == StatusPending {
+				anyPending = true
+				break
+			}
+		}
+
+		if !anyPending {
+			i.Status = StatusClosed
+			events = append(events, DistributionPlanCompletedEvent{
+				InvitationID:   i.ID,
+				Title:          i.Title,
+				Subscribers:    i.Subscribers,
+				RemainingSpots: i.Spots,
+			})
+			events = append(events, InvitationClosedEvent{Reason: "All strategies exhausted"})
+		}
 		return events
 	}
 
@@ -331,57 +359,59 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 			}
 		}
 
-		toInvite := i.Spots - activeCount
-		if toInvite <= 0 {
-			return events
-		}
-
-		for _, participant := range strategy.Participants {
-			if toInvite == 0 {
-				break
-			}
-
-			alreadyInvited := false
-			for _, inv := range i.PersonalInvites {
-				if inv.ParticipantEmail == participant.Email {
-					alreadyInvited = true
+		if activeCount < i.Spots {
+			// Find next person to invite
+			sentAny := false
+			for _, participant := range strategy.Participants {
+				if activeCount >= i.Spots {
 					break
+				}
+
+				alreadyInvited := false
+				for _, inv := range i.PersonalInvites {
+					if inv.ParticipantEmail == participant.Email {
+						alreadyInvited = true
+						break
+					}
+				}
+
+				if !alreadyInvited {
+					inviteID := uuid.New()
+					i.PersonalInvites = append(i.PersonalInvites, PersonalInvite{
+						ID:               inviteID,
+						ParticipantEmail: participant.Email,
+						Status:           StatusPending,
+						ExpiresAt:        now.Add(strategy.InviteDuration),
+					})
+					events = append(events, EmailSentEvent{
+						Recipient: participant.Email,
+						Subject:   "Invitasjon til " + i.Title,
+						URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
+						Body:      i.RenderEmailBody(inviteID, baseURL),
+					})
+					activeCount++
+					sentAny = true
 				}
 			}
 
-			if !alreadyInvited {
-				inviteID := uuid.New()
-				expiresAt := now.Add(strategy.InviteDuration)
-				i.PersonalInvites = append(i.PersonalInvites, PersonalInvite{
-					ID:               inviteID,
-					ParticipantEmail: participant.Email,
-					Status:           StatusPending,
-					ExpiresAt:        expiresAt,
-				})
-				events = append(events, EmailSentEvent{
-					Recipient: participant.Email,
-					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
-					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
-					Body:      i.RenderEmailBody(inviteID, baseURL),
-				})
-				toInvite--
+			// If we didn't send anything new, check if we should move to next strategy
+			if !sentAny {
+				stillPending := false
+				for _, inv := range i.PersonalInvites {
+					if inv.Status == StatusPending {
+						stillPending = true
+						break
+					}
+				}
+				if !stillPending {
+					i.CurrentStrategyIndex++
+					events = append(events, i.activateCurrentStrategy(now, baseURL)...)
+				}
 			}
-		}
-
-		// Move to next strategy if nothing is pending and we have more spots
-		stillPending := false
-		for _, inv := range i.PersonalInvites {
-			if inv.Status == StatusPending {
-				stillPending = true
-				break
-			}
-		}
-		if !stillPending && toInvite > 0 {
-			i.CurrentStrategyIndex++
-			events = append(events, i.activateCurrentStrategy(now, baseURL)...)
 		}
 
 	case StrategyFCFS:
+		// Invite everyone in this strategy who hasn't been invited yet
 		sentAny := false
 		for _, participant := range strategy.Participants {
 			alreadyInvited := false
@@ -394,33 +424,27 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 
 			if !alreadyInvited {
 				inviteID := uuid.New()
-				// Use TotalDuration for FCFS as requested
-				expiresAt := now.Add(strategy.TotalDuration)
-				if strategy.TotalDuration == 0 {
-					expiresAt = now.Add(365 * 24 * time.Hour) // Default to long if not set
-				}
-
 				i.PersonalInvites = append(i.PersonalInvites, PersonalInvite{
 					ID:               inviteID,
 					ParticipantEmail: participant.Email,
 					Status:           StatusPending,
-					ExpiresAt:        expiresAt,
+					ExpiresAt:        now.Add(strategy.TotalDuration),
 				})
 				events = append(events, EmailSentEvent{
 					Recipient: participant.Email,
-					Subject:   fmt.Sprintf("Invitation: %s", i.Title),
+					Subject:   "Invitasjon til " + i.Title,
 					URL:       fmt.Sprintf("%s/i/%s", baseURL, inviteID),
 					Body:      i.RenderEmailBody(inviteID, baseURL),
 				})
 				sentAny = true
 			}
 		}
-
-		// If we didn't send anything new, check if we should move to next strategy
+		
+		// For FCFS, we just wait until it's finished or someone accepts
 		if !sentAny {
 			stillPending := false
-			for _, inv := range i.PersonalInvites {
-				if inv.Status == StatusPending {
+			for _, pi := range i.PersonalInvites {
+				if pi.Status == StatusPending {
 					stillPending = true
 					break
 				}

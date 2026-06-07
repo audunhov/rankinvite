@@ -58,6 +58,10 @@ type Invitation struct {
 	EndTime              time.Time        `json:"end_time"`
 	Description          string           `json:"description"`
 	CustomEmailTemplate  string           `json:"custom_email_template"`
+	SenderName           string           `json:"sender_name"`
+	SenderEmail          string           `json:"sender_email"`
+	CreatedBy            string           `json:"created_by"`
+	Subscribers          []string         `json:"subscribers"`
 	Spots                int              `json:"spots"`
 	Strategies           []Strategy       `json:"strategies"`
 	CurrentStrategyIndex int              `json:"current_strategy_index"`
@@ -73,6 +77,7 @@ func NewInvitation(title string, spots int) *Invitation {
 		Spots:           spots,
 		Status:          StatusDraft,
 		PersonalInvites: []PersonalInvite{},
+		Subscribers:     []string{},
 		CreatedAt:       time.Now(),
 	}
 }

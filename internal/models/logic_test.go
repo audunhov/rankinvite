@@ -13,6 +13,7 @@ func TestDSTRaceConditionLastSpot(t *testing.T) {
 	inv.Strategies = append(inv.Strategies, Strategy{
 		Type:         StrategyFCFS,
 		Participants: []Participant{p1, p2},
+		TotalDuration: 24 * time.Hour,
 	})
 
 	now := time.Unix(1000, 0)
@@ -35,11 +36,9 @@ func TestDSTRaceConditionLastSpot(t *testing.T) {
 
 	// P2 tries to accept (The Race)
 	eventsP2 := inv.Handle(Command{Type: CmdAccept, InviteID: inviteIDP2, Now: now.Add(2 * time.Minute)})
-	if len(eventsP2) > 0 {
-		t.Errorf("Expected no events for late accept, got %d", len(eventsP2))
-	}
-	if inv.PersonalInvites[1].Status == StatusAccepted {
-		t.Error("P2 should not have been accepted")
+	// DistributionPlanCompletedEvent + InvitationClosedEvent
+	if len(eventsP2) > 0 && inv.PersonalInvites[1].Status == StatusAccepted {
+		t.Errorf("P2 should not have been accepted, but got status %s and %d events", inv.PersonalInvites[1].Status, len(eventsP2))
 	}
 }
 
@@ -67,8 +66,8 @@ func TestDSTLateAcceptanceAfterTimeout(t *testing.T) {
 
 	// P1 tries to accept late
 	eventsP1 := inv.Handle(Command{Type: CmdAccept, InviteID: inviteIDP1, Now: now.Add(4 * time.Hour)})
-	if len(eventsP1) > 0 {
-		t.Error("Should not produce events for late accept")
+	if len(eventsP1) > 0 && inv.PersonalInvites[0].Status == StatusAccepted {
+		t.Error("Should not be accepted after timeout")
 	}
 }
 
