@@ -4,9 +4,12 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
+      - rankinvite_data:/app/data
     environment:
       - BASE_URL=http://localhost:8080 # Bytt til din ekte domeneadresse i prod
       - PORT=8080
       - DATABASE_URL=/app/data/rankinvite.db
     restart: unless-stopped
+
+volumes:
+  rankinvite_data:
