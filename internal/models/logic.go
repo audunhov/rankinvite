@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"fmt"
+	"strings"
 	"text/template"
 	"time"
 
@@ -24,7 +25,7 @@ const emailWrapper = `<!DOCTYPE html>
             margin: 0 auto; 
         }
         h1 { font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px; }
-        p { font-size: 18px; line-height: 1.6; margin: 24px 0; }
+        .content { font-size: 18px; line-height: 1.6; margin: 24px 0; white-space: pre-wrap; }
         .button { 
             display: inline-block; 
             background-color: #00ff00; 
@@ -43,7 +44,7 @@ const emailWrapper = `<!DOCTYPE html>
 <body>
     <div class="card">
         <h1>RankInvite</h1>
-        <p>{{.Content}}</p>
+        <div class="content">{{.Content}}</div>
         <div style="margin: 40px 0;">
             <a href="{{.URL}}" class="button">SVAR PÅ INVITASJON</a>
         </div>
@@ -84,6 +85,9 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 			content = fmt.Sprintf("Hei! Du er herved invitert til %s. (Feil i mal: %v)", i.Title, err)
 		}
 	}
+
+	// Convert newlines to HTML breaks for email clients that don't respect white-space: pre-wrap
+	content = strings.ReplaceAll(content, "\n", "<br>")
 
 	wrapperTmpl, _ := template.New("wrapper").Parse(emailWrapper)
 	var buf bytes.Buffer
