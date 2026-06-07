@@ -91,6 +91,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
 	mux.HandleFunc("/admin/invitations/delete", admin(s.handleDeleteInvitation))
 	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
+	mux.HandleFunc("/admin/invitations/strategies/delete", admin(s.handleDeleteStrategy))
 	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
 	mux.HandleFunc("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
 	mux.HandleFunc("/admin/invitations/preview", admin(s.handlePreviewEmail))
@@ -590,7 +591,44 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	})
 	
 	s.repo.Save(inv)
+	s.setFlash(w, "Strategien ble lagt til!", "success")
 	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+}
+
+func (s *Server) handleDeleteStrategy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	idStr := r.FormValue("id")
+	inviteID, _ := uuid.Parse(idStr)
+	inv, _ := s.repo.GetByID(inviteID)
+	if inv == nil || inv.Status != models.StatusDraft {
+		http.Error(w, "Ugyldig invitasjon", http.StatusBadRequest)
+		return
+	}
+
+	var index int
+	fmt.Sscanf(r.FormValue("index"), "%d", &index)
+
+	if index < 0 || index >= len(inv.Strategies) {
+		http.Error(w, "Ugyldig indeks", http.StatusBadRequest)
+		return
+	}
+
+	// Remove strategy at index
+	inv.Strategies = append(inv.Strategies[:index], inv.Strategies[index+1:]...)
+
+	err := s.repo.Save(inv)
+	if err != nil {
+		slog.Error("Failed to delete strategy", "error", err)
+		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
+		return
+	}
+
+	s.setFlash(w, "Strategien ble slettet!", "success")
+	http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s", inv.ID), http.StatusSeeOther)
 }
 
 func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Request) {

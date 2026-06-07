@@ -90,7 +90,15 @@
         
         {{if .Invitation.Strategies}}
             {{range $index, $strat := .Invitation.Strategies}}
-            <div style="border: 3px solid black; padding: 20px; margin-bottom: 20px; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); background: white;">
+            <div style="border: 3px solid black; padding: 20px; margin-bottom: 20px; box-shadow: 4px 4px 0px 0px rgba(0,0,0,1); background: white; position: relative;">
+                {{if eq $.Invitation.Status "draft"}}
+                <form action="/admin/invitations/strategies/delete" method="POST" style="position: absolute; top: 10px; right: 10px; margin: 0;">
+                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                    <input type="hidden" name="id" value="{{$.Invitation.ID}}">
+                    <input type="hidden" name="index" value="{{$index}}">
+                    <button type="submit" class="remove-btn" onclick="return confirm('Slette denne strategien?')">SLETT</button>
+                </form>
+                {{end}}
                 <div style="font-weight: bold; text-transform: uppercase; font-size: 0.8em; background: black; color: white; display: inline-block; padding: 4px 12px; margin-bottom: 15px;">{{$strat.Type}}</div>
                 <div>Deltakere: {{len $strat.Participants}}</div>
                 {{if eq $strat.Type "priority_list"}}
