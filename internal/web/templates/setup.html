@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Velkommen til RankInvite - Førstegangsoppsett</title>
+    {{template "head" .}}
+</head>
+<body class="container">
+    <div style="max-width: 800px; margin: 60px auto;">
+        <h1 style="font-size: 3em; margin-bottom: 40px;">VELKOMMEN TIL RANKINVITE</h1>
+        
+        {{template "flash_messages" .}}
+
+        <form action="/setup/post" method="POST">
+            <div class="card">
+                <h2>1. Opprett din administrator-bruker</h2>
+                <p style="margin-bottom: 24px;">Dette blir den første kontoen som kan logge inn og administrere systemet.</p>
+                
+                <div class="form-group">
+                    <label>Ditt navn</label>
+                    <input type="text" name="name" required placeholder="f.eks. Ola Nordmann">
+                </div>
+                <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>E-post</label>
+                        <input type="email" name="email" required placeholder="ola@domene.no">
+                    </div>
+                    <div class="form-group">
+                        <label>Passord (minst 6 tegn)</label>
+                        <input type="password" name="password" minlength="6" required>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top: 40px;">
+                <h2>2. E-post og SMTP-oppsett</h2>
+                <p style="margin-bottom: 24px;">Konfigurer hvordan systemet skal sende ut invitasjoner.</p>
+                
+                <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div class="form-group">
+                        <label>Navn på avsender (System)</label>
+                        <input type="text" name="global_sender_name" value="RankInvite System" required>
+                    </div>
+                    <div class="form-group">
+                        <label>E-postadresse (System)</label>
+                        <input type="email" name="global_sender_email" placeholder="noreply@domene.no" required>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="display: grid; grid-template-columns: 3fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="form-group">
+                        <label>SMTP Server</label>
+                        <input type="text" name="smtp_host" placeholder="smtp.gmail.com eller localhost" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Port</label>
+                        <input type="number" name="smtp_port" value="587" required>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+                    <div class="form-group">
+                        <label>SMTP Brukernavn</label>
+                        <input type="text" name="smtp_user" placeholder="valgfritt">
+                    </div>
+                    <div class="form-group">
+                        <label>SMTP Passord</label>
+                        <input type="password" name="smtp_pass" placeholder="valgfritt">
+                    </div>
+                </div>
+                
+                <div style="background: #ffff00; padding: 15px; border: 2px solid black; font-size: 0.8em; margin-top: 20px;">
+                    <strong>Tips:</strong> Hvis du tester lokalt, kan du bruke <code>localhost</code> og port <code>1025</code> (MailHog).
+                </div>
+            </div>
+
+            <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 40px; font-size: 1.5em; padding: 30px;">FULLFØR OPPSETT OG START SYSTEMET</button>
+        </form>
+    </div>
+</body>
+</html>

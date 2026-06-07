@@ -91,9 +91,12 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/login", recoverMiddleware(http.HandlerFunc(s.handleLogin)))
 	mux.HandleFunc("/logout", recoverMiddleware(http.HandlerFunc(s.handleLogout)))
 
+	mux.HandleFunc("/setup", recoverMiddleware(http.HandlerFunc(s.handleSetup)))
+	mux.HandleFunc("/setup/post", recoverMiddleware(http.HandlerFunc(s.handlePostSetup)))
+
 	// Protected Admin Routes
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
-		return recoverMiddleware(s.requireAdmin(s.csrfMiddleware(h)))
+		return recoverMiddleware(s.setupMiddleware(s.requireAdmin(s.csrfMiddleware(h))))
 	}
 
 	mux.HandleFunc("/admin", admin(s.handleAdminDashboard))
@@ -133,6 +136,10 @@ type PageData struct {
 	DefaultEmailTemplate string
 	GlobalSenderName     string
 	GlobalSenderEmail    string
+	SMTPHost             string
+	SMTPPort             string
+	SMTPUser             string
+	SMTPPass             string
 	SharedSenders        string
 	SharedSendersList    []string
 	AdminName            string
@@ -162,6 +169,70 @@ func (s *Server) setFlash(w http.ResponseWriter, message, flashType string) {
 		Path:     "/",
 		HttpOnly: true,
 	})
+}
+
+func (s *Server) setupMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		admins, err := s.auth.ListAdmins()
+		if err != nil {
+			slog.Error("Failed to check admins for setup", "error", err)
+		}
+		if len(admins) == 0 && r.URL.Path != "/setup" && r.URL.Path != "/setup/post" {
+			http.Redirect(w, r, "/setup", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	}
+}
+
+func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
+	admins, _ := s.auth.ListAdmins()
+	if len(admins) > 0 {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+	s.render(w, r, "setup.html", PageData{})
+}
+
+func (s *Server) handlePostSetup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	admins, _ := s.auth.ListAdmins()
+	if len(admins) > 0 {
+		http.Error(w, "Setup already completed", http.StatusForbidden)
+		return
+	}
+
+	name := r.FormValue("name")
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	if name == "" || email == "" || len(password) < 6 {
+		s.setFlash(w, "Vennligst fyll ut alle felt korrekt. Passord må være minst 6 tegn.", "error")
+		http.Redirect(w, r, "/setup", http.StatusSeeOther)
+		return
+	}
+
+	// 1. Create Admin
+	if err := s.auth.CreateAdmin(email, name, password); err != nil {
+		slog.Error("Failed to create initial admin", "error", err)
+		http.Error(w, "Kunne ikke opprette administrator", http.StatusInternalServerError)
+		return
+	}
+
+	// 2. Save SMTP Settings
+	s.repo.UpdateSetting("global_sender_name", r.FormValue("global_sender_name"))
+	s.repo.UpdateSetting("global_sender_email", r.FormValue("global_sender_email"))
+	s.repo.UpdateSetting("smtp_host", r.FormValue("smtp_host"))
+	s.repo.UpdateSetting("smtp_port", r.FormValue("smtp_port"))
+	s.repo.UpdateSetting("smtp_user", r.FormValue("smtp_user"))
+	s.repo.UpdateSetting("smtp_pass", r.FormValue("smtp_pass"))
+
+	s.setFlash(w, "Oppsett fullført! Logg inn med din nye bruker.", "success")
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
@@ -1096,12 +1167,20 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
 	globalSenderName, _ := s.repo.GetSetting("global_sender_name")
 	globalSenderEmail, _ := s.repo.GetSetting("global_sender_email")
+	smtpHost, _ := s.repo.GetSetting("smtp_host")
+	smtpPort, _ := s.repo.GetSetting("smtp_port")
+	smtpUser, _ := s.repo.GetSetting("smtp_user")
+	smtpPass, _ := s.repo.GetSetting("smtp_pass")
 	sharedSenders, _ := s.repo.GetSetting("shared_senders")
 
 	s.render(w, r, "settings.html", PageData{
 		DefaultEmailTemplate: defaultTemplate,
 		GlobalSenderName:     globalSenderName,
 		GlobalSenderEmail:    globalSenderEmail,
+		SMTPHost:             smtpHost,
+		SMTPPort:             smtpPort,
+		SMTPUser:             smtpUser,
+		SMTPPass:             smtpPass,
 		SharedSenders:        sharedSenders,
 	})
 }
@@ -1175,6 +1254,10 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	s.repo.UpdateSetting("default_email_template", r.FormValue("default_email_template"))
 	s.repo.UpdateSetting("global_sender_name", r.FormValue("global_sender_name"))
 	s.repo.UpdateSetting("global_sender_email", r.FormValue("global_sender_email"))
+	s.repo.UpdateSetting("smtp_host", r.FormValue("smtp_host"))
+	s.repo.UpdateSetting("smtp_port", r.FormValue("smtp_port"))
+	s.repo.UpdateSetting("smtp_user", r.FormValue("smtp_user"))
+	s.repo.UpdateSetting("smtp_pass", r.FormValue("smtp_pass"))
 	s.repo.UpdateSetting("shared_senders", r.FormValue("shared_senders"))
 
 	s.setFlash(w, "Innstillingene ble lagret!", "success")

@@ -105,8 +105,14 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 		return
 	}
 
+	smtpHost, _ := w.repo.GetSetting("smtp_host")
+	smtpPort, _ := w.repo.GetSetting("smtp_port")
+	smtpUser, _ := w.repo.GetSetting("smtp_user")
+	smtpPass, _ := w.repo.GetSetting("smtp_pass")
+	globalSenderEmail, _ := w.repo.GetSetting("global_sender_email")
+
 	for _, recipient := range subscribers {
-		from := "system@rankinvite.no"
+		from := globalSenderEmail
 		to := []string{recipient}
 		
 		header := make(map[string]string)
@@ -124,7 +130,12 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 		}
 		message += "\r\n" + htmlBody
 
-		err := smtp.SendMail("localhost:1025", nil, from, to, []byte(message))
+		var auth smtp.Auth
+		if smtpUser != "" {
+			auth = smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
+		}
+
+		err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, []byte(message))
 		if err != nil {
 			slog.Warn("Failed to notify admin", "admin", recipient, "error", err)
 		} else {
@@ -135,6 +146,11 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 
 func (w *Worker) sendEmail(e models.EmailSentEvent, inv *models.Invitation) {
 	slog.Info("Attempting to send email", "recipient", e.Recipient, "subject", e.Subject)
+
+	smtpHost, _ := w.repo.GetSetting("smtp_host")
+	smtpPort, _ := w.repo.GetSetting("smtp_port")
+	smtpUser, _ := w.repo.GetSetting("smtp_user")
+	smtpPass, _ := w.repo.GetSetting("smtp_pass")
 
 	fromName := inv.SenderName
 	fromEmail := inv.SenderEmail
@@ -161,7 +177,12 @@ func (w *Worker) sendEmail(e models.EmailSentEvent, inv *models.Invitation) {
 	}
 	message += "\r\n" + e.Body
 
-	err := smtp.SendMail("localhost:1025", nil, fromEmail, to, []byte(message))
+	var auth smtp.Auth
+	if smtpUser != "" {
+		auth = smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
+	}
+
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, to, []byte(message))
 	if err != nil {
 		slog.Error("Failed to send email", "recipient", e.Recipient, "error", err)
 	} else {

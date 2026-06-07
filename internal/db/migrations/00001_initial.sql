@@ -41,6 +41,10 @@ Det er begrenset med plasser, så vi setter pris på raskt svar!');
 
 INSERT INTO settings (key, value) VALUES ('global_sender_name', 'RankInvite System');
 INSERT INTO settings (key, value) VALUES ('global_sender_email', 'noreply@rankinvite.no');
+INSERT INTO settings (key, value) VALUES ('smtp_host', 'localhost');
+INSERT INTO settings (key, value) VALUES ('smtp_port', '1025');
+INSERT INTO settings (key, value) VALUES ('smtp_user', '');
+INSERT INTO settings (key, value) VALUES ('smtp_pass', '');
 INSERT INTO settings (key, value) VALUES ('shared_senders', '');
 
 -- +goose Down

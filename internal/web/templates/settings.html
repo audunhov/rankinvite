@@ -30,6 +30,27 @@
                 </div>
             </div>
 
+            <h2 style="margin-top: 40px;">SMTP-oppsett</h2>
+            <p style="margin-bottom: 20px; font-size: 0.9em;">Konfigurasjon for utsending av e-post.</p>
+            <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <div class="form-group">
+                    <label>SMTP Server</label>
+                    <input type="text" name="smtp_host" value="{{.SMTPHost}}" required>
+                </div>
+                <div class="form-group">
+                    <label>Port</label>
+                    <input type="number" name="smtp_port" value="{{.SMTPPort}}" required>
+                </div>
+                <div class="form-group">
+                    <label>Brukernavn (valgfritt)</label>
+                    <input type="text" name="smtp_user" value="{{.SMTPUser}}">
+                </div>
+                <div class="form-group">
+                    <label>Passord (valgfritt)</label>
+                    <input type="password" name="smtp_pass" value="{{.SMTPPass}}">
+                </div>
+            </div>
+
             <h2 style="margin-top: 40px;">Faste felles-avsendere</h2>
             <p style="margin-bottom: 20px; font-size: 0.9em;">Legg inn ett navn og e-post per linje, f.eks: <code>Felleskontoret &lt;post@parti.no&gt;</code></p>
             <div class="form-group">
