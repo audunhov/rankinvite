@@ -1,1 +1,15 @@
-/target
+# Binaries
+/rankinvite
+/tmp/main
+/target/
+
+# Directories
+/tmp/
+/bin/
+
+# Databases
+/*.db
+/*.db-journal
+
+# Environment
+.env
