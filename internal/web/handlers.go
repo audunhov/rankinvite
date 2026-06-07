@@ -144,11 +144,13 @@ func (s *Server) CSRFMiddleware(next http.Handler) http.Handler {
 func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	// Root redirect
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" {
-			http.NotFound(w, r)
+		if r.URL.Path == "/" {
+			http.Redirect(w, r, "/admin/", http.StatusSeeOther)
 			return
 		}
-		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+		// If we are here, it's a real 404
+		slog.Warn("Not found", "path", r.URL.Path)
+		http.NotFound(w, r)
 	})
 
 	// Public Invitation routes
@@ -167,7 +169,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 		return s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(h)))
 	}
 
-	mux.Handle("/admin", admin(s.handleAdminDashboard))
+	mux.Handle("/admin/", admin(s.handleAdminDashboard))
 	mux.Handle("/admin/invitations/new", admin(s.handleNewInvitation))
 	mux.Handle("/admin/invitations/edit", admin(s.handleEditInvitation))
 	mux.Handle("/admin/invitations/update", admin(s.handleUpdateInvitation))
@@ -182,7 +184,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.Handle("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
 	mux.Handle("/admin/invitations/preview", admin(s.handlePreviewEmail))
 
-	mux.Handle("/admin/users", admin(s.handleListUsers))
+	mux.Handle("/admin/users/", admin(s.handleListUsers))
 	mux.Handle("/admin/users/create", admin(s.handleCreateUser))
 	mux.Handle("/admin/users/delete", admin(s.handleDeleteUser))
 	mux.Handle("/admin/users/change-password", admin(s.handleChangePassword))
@@ -190,7 +192,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.Handle("/admin/invitations/subscribe", admin(s.handleSubscribe))
 	mux.Handle("/admin/invitations/unsubscribe", admin(s.handleUnsubscribe))
 
-	mux.Handle("/admin/settings", admin(s.handleSettings))
+	mux.Handle("/admin/settings/", admin(s.handleSettings))
 	mux.Handle("/admin/settings/update", admin(s.handleUpdateSettings))
 	mux.Handle("/admin/settings/preview", admin(s.handlePreviewDefaultTemplate))
 
