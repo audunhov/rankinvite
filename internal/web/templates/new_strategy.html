@@ -24,8 +24,28 @@
             </div>
 
             <div id="durationGroup" class="form-group">
-                <label id="durationLabel">Svarfrist per person (minutter)</label>
-                <input type="number" name="duration_mins" value="120" min="1" required>
+                <label id="durationLabel">Svarfrist per person</label>
+                <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <select id="durationPresets" onchange="updateDurationFromPreset()">
+                        <option value="15">15 minutter</option>
+                        <option value="30">30 minutter</option>
+                        <option value="60">1 time</option>
+                        <option value="120" selected>2 timer</option>
+                        <option value="240">4 timer</option>
+                        <option value="480">8 timer</option>
+                        <option value="720">12 timer</option>
+                        <option value="1440">1 dag (24t)</option>
+                        <option value="2880">2 dager (48t)</option>
+                        <option value="custom">Egendefinert...</option>
+                    </select>
+                    <div id="customDurationGroup" style="display: none;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <input type="number" id="customMins" value="120" min="1" oninput="updateHiddenMins()">
+                            <span style="font-size: 0.8em; font-weight: bold;">MINUTTER</span>
+                        </div>
+                    </div>
+                </div>
+                <input type="hidden" name="duration_mins" id="duration_mins_hidden" value="120">
             </div>
 
             <div class="form-group">
@@ -123,6 +143,28 @@
 
         function updateJson() {
             document.getElementById('participantsJson').value = JSON.stringify(participants);
+        }
+
+        function updateDurationFromPreset() {
+            const preset = document.getElementById('durationPresets').value;
+            const customGroup = document.getElementById('customDurationGroup');
+            const hiddenInput = document.getElementById('duration_mins_hidden');
+            const customInput = document.getElementById('customMins');
+
+            if (preset === 'custom') {
+                customGroup.style.display = 'block';
+                hiddenInput.value = customInput.value;
+            } else {
+                customGroup.style.display = 'none';
+                hiddenInput.value = preset;
+                customInput.value = preset;
+            }
+        }
+
+        function updateHiddenMins() {
+            const customInput = document.getElementById('customMins');
+            const hiddenInput = document.getElementById('duration_mins_hidden');
+            hiddenInput.value = customInput.value;
         }
 
         function toggleDuration() {

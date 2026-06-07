@@ -411,7 +411,7 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
 
-	s.render(w, r, "dashboard.html", PageData{
+	data := PageData{
 		Invitations:  invs,
 		Page:         page,
 		TotalPages:   totalPages,
@@ -419,7 +419,14 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		HasPrev:      page > 1,
 		SearchQuery:  searchQuery,
 		StatusFilter: statusFilter,
-	})
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.templates.ExecuteTemplate(w, "invitation_table", data)
+		return
+	}
+
+	s.render(w, r, "dashboard.html", data)
 }
 
 func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
