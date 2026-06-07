@@ -19,7 +19,10 @@
                 {{if not .Invitation.StartTime.IsZero}}
                 <div>
                     <strong style="text-transform: uppercase; font-size: 0.8em;">Når</strong>
-                    <div style="font-weight: bold; margin-top: 8px;">{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}</div>
+                    <div style="font-weight: bold; margin-top: 8px;">
+                        {{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}
+                        {{if not .Invitation.EndTime.IsZero}} - {{.Invitation.EndTime.Format "15:04"}}{{end}}
+                    </div>
                 </div>
                 {{end}}
             </div>

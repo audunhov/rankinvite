@@ -72,12 +72,16 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				URL         string
 				Location    string
 				StartTime   string
+				EndTime     string
+				Duration    string
 				Description string
 			}{
 				Title:       i.Title,
 				URL:         url,
 				Location:    i.Location,
 				StartTime:   i.StartTime.Format("02.01.2006 15:04"),
+				EndTime:     i.EndTime.Format("15:04"),
+				Duration:    i.EndTime.Sub(i.StartTime).String(),
 				Description: i.Description,
 			}
 			tmpl.Execute(&buf, data)

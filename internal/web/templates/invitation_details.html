@@ -48,7 +48,10 @@
             </div>
             <div>
                 <label>Tidspunkt</label>
-                <p>{{if .Invitation.StartTime.IsZero}}Ikke oppgitt{{else}}{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}{{end}}</p>
+                <p>
+                    {{if .Invitation.StartTime.IsZero}}Ikke oppgitt{{else}}{{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}{{end}}
+                    {{if not .Invitation.EndTime.IsZero}} - {{.Invitation.EndTime.Format "15:04"}}{{end}}
+                </p>
             </div>
         </div>
         <label>Beskrivelse</label>

@@ -235,9 +235,12 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	location := r.FormValue("location")
 	description := r.FormValue("description")
 	
-	var startTime time.Time
+	var startTime, endTime time.Time
 	if stStr := r.FormValue("start_time"); stStr != "" {
 		startTime, _ = time.Parse("2006-01-02T15:04", stStr)
+	}
+	if etStr := r.FormValue("end_time"); etStr != "" {
+		endTime, _ = time.Parse("2006-01-02T15:04", etStr)
 	}
 
 	var spots int
@@ -249,6 +252,7 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.Location = location
 	inv.Description = description
 	inv.StartTime = startTime
+	inv.EndTime = endTime
 	inv.CustomEmailTemplate = defaultTemplate
 
 	err := s.repo.Save(inv)
@@ -325,7 +329,11 @@ func (s *Server) handleInviteCalendar(w http.ResponseWriter, r *http.Request) {
 
 	// Generate ICS
 	start := foundInv.StartTime.UTC().Format("20060102T150405Z")
-	end := foundInv.StartTime.Add(time.Hour).UTC().Format("20060102T150405Z")
+	endTime := foundInv.EndTime
+	if endTime.IsZero() {
+		endTime = foundInv.StartTime.Add(time.Hour)
+	}
+	end := endTime.UTC().Format("20060102T150405Z")
 	
 	ics := fmt.Sprintf("BEGIN:VCALENDAR\r\n"+
 		"VERSION:2.0\r\n"+

@@ -55,6 +55,7 @@ type Invitation struct {
 	Title                string           `json:"title"`
 	Location             string           `json:"location"`
 	StartTime            time.Time        `json:"start_time"`
+	EndTime              time.Time        `json:"end_time"`
 	Description          string           `json:"description"`
 	CustomEmailTemplate  string           `json:"custom_email_template"`
 	Spots                int              `json:"spots"`
