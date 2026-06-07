@@ -86,7 +86,11 @@
             </table>
         </div>
         {{else}}
-        <p>Ingen invitasjoner opprettet ennå.</p>
+            {{if or .SearchQuery .StatusFilter}}
+                <p>Ingen invitasjoner samsvarer med søket ditt.</p>
+            {{else}}
+                <p>Ingen invitasjoner opprettet ennå.</p>
+            {{end}}
         {{end}}
 
         {{if gt .TotalPages 1}}
