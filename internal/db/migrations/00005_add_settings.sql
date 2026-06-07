@@ -14,7 +14,11 @@ Sted: {{.Location}}
 
 {{.Description}}
 
-Vennligst klikk på knappen nedenfor for å registrere om du kan delta eller ikke. Det er begrenset med plasser, så vi setter pris på raskt svar!');
+Vennligst klikk på knappen nedenfor for å registrere om du kan delta eller ikke.
+
+Svarfrist: {{.Deadline}}
+
+Det er begrenset med plasser, så vi setter pris på raskt svar!');
 
 -- +goose Down
 DROP TABLE settings;

@@ -56,6 +56,16 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	content := ""
 	url := fmt.Sprintf("%s/i/%s", baseURL, inviteID)
 
+	var deadlineStr string
+	for _, pi := range i.PersonalInvites {
+		if pi.ID == inviteID && !pi.ExpiresAt.IsZero() {
+			deadlineStr = pi.ID.String() // Placeholder for testing if needed
+			// We use a safe default if it's the preview (where ID won't match)
+			deadlineStr = pi.ExpiresAt.Format("02.01.2006 15:04")
+			break
+		}
+	}
+
 	if i.CustomEmailTemplate == "" {
 		content = fmt.Sprintf("Hei! Du er herved invitert til %s.", i.Title)
 	} else {
@@ -76,6 +86,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				durationStr = i.EndTime.Sub(i.StartTime).String()
 			}
 
+			// If deadline is still empty (e.g. in preview), provide a dummy one
+			if deadlineStr == "" {
+				deadlineStr = time.Now().Add(24 * time.Hour).Format("02.01.2006 15:04")
+			}
+
 			data := struct {
 				Title       string
 				Location    string
@@ -83,6 +98,7 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				EndTime     string
 				Duration    string
 				Description string
+				Deadline    string
 			}{
 				Title:       i.Title,
 				Location:    i.Location,
@@ -90,6 +106,7 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				EndTime:     endTimeStr,
 				Duration:    durationStr,
 				Description: i.Description,
+				Deadline:    deadlineStr,
 			}
 			tmpl.Execute(&buf, data)
 			content = buf.String()
