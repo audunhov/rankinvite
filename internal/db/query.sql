@@ -12,7 +12,7 @@ SELECT * FROM invitations
 WHERE (sqlc.arg(query) = '' OR json_extract(data, '$.title') LIKE '%' || sqlc.arg(query) || '%')
   AND (sqlc.arg(status) = '' OR json_extract(data, '$.status') = sqlc.arg(status))
 ORDER BY rowid DESC
-LIMIT ? OFFSET ?;
+LIMIT sqlc.arg('limit') OFFSET sqlc.arg('offset');
 
 -- name: CountInvitations :one
 SELECT COUNT(*) FROM invitations;

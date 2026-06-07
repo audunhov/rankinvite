@@ -272,25 +272,25 @@ func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams
 
 const listInvitationsFiltered = `-- name: ListInvitationsFiltered :many
 SELECT id, data FROM invitations
-WHERE (?3 = '' OR json_extract(data, '$.title') LIKE '%' || ?3 || '%')
-  AND (?4 = '' OR json_extract(data, '$.status') = ?4)
+WHERE (?1 = '' OR json_extract(data, '$.title') LIKE '%' || ?1 || '%')
+  AND (?2 = '' OR json_extract(data, '$.status') = ?2)
 ORDER BY rowid DESC
-LIMIT ? OFFSET ?
+LIMIT ?4 OFFSET ?3
 `
 
 type ListInvitationsFilteredParams struct {
 	Query  interface{} `json:"query"`
 	Status interface{} `json:"status"`
-	Limit  int64       `json:"limit"`
 	Offset int64       `json:"offset"`
+	Limit  int64       `json:"limit"`
 }
 
 func (q *Queries) ListInvitationsFiltered(ctx context.Context, arg ListInvitationsFilteredParams) ([]Invitation, error) {
 	rows, err := q.db.QueryContext(ctx, listInvitationsFiltered,
 		arg.Query,
 		arg.Status,
-		arg.Limit,
 		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err

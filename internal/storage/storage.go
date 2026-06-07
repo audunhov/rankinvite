@@ -70,8 +70,8 @@ func (r *InvitationRepository) ListFiltered(query, status string, limit, offset 
 	rows, err := r.queries.ListInvitationsFiltered(context.Background(), db.ListInvitationsFilteredParams{
 		Query:  query,
 		Status: status,
-		Limit:  int64(limit),
 		Offset: int64(offset),
+		Limit:  int64(limit),
 	})
 	if err != nil {
 		return nil, err
