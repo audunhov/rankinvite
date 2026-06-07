@@ -99,6 +99,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/admin/users", admin(s.handleListUsers))
 	mux.HandleFunc("/admin/users/create", admin(s.handleCreateUser))
 	mux.HandleFunc("/admin/users/delete", admin(s.handleDeleteUser))
+	mux.HandleFunc("/admin/users/change-password", admin(s.handleChangePassword))
 
 	mux.HandleFunc("/admin/settings", admin(s.handleSettings))
 	mux.HandleFunc("/admin/settings/update", admin(s.handleUpdateSettings))
@@ -779,7 +780,44 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	slog.Info("Admin user deleted", "id", idStr)
+	s.setFlash(w, "Brukeren ble slettet", "success")
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	session := r.Context().Value(sessionKey).(*auth.Session)
+	currentPassword := r.FormValue("current_password")
+	newPassword := r.FormValue("new_password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	if newPassword != confirmPassword {
+		s.setFlash(w, "Nye passord samsvarer ikke", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	// Verify current password
+	user, err := s.auth.VerifyAdmin(session.Email, currentPassword)
+	if err != nil || user == nil {
+		s.setFlash(w, "Feil nåværende passord", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	err = s.auth.UpdatePassword(user.ID, newPassword)
+	if err != nil {
+		slog.Error("Failed to update password", "error", err)
+		s.setFlash(w, "Serverfeil ved bytte av passord", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
+	s.setFlash(w, "Passordet ble endret!", "success")
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 

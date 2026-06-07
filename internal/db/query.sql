@@ -33,6 +33,11 @@ VALUES (?, ?, ?);
 DELETE FROM admins
 WHERE id = ?;
 
+-- name: UpdateAdminPassword :exec
+UPDATE admins
+SET password_hash = ?
+WHERE id = ?;
+
 -- name: AdminExists :one
 SELECT EXISTS(SELECT 1 FROM admins WHERE email = ?);
 

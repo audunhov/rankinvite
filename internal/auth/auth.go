@@ -81,6 +81,18 @@ func (s *AuthService) DeleteAdmin(id string) error {
 	return s.queries.DeleteAdmin(context.Background(), id)
 }
 
+func (s *AuthService) UpdatePassword(adminID uuid.UUID, newPassword string) error {
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.queries.UpdateAdminPassword(context.Background(), db.UpdateAdminPasswordParams{
+		ID:           adminID.String(),
+		PasswordHash: string(hash),
+	})
+}
+
 func (s *AuthService) VerifyAdmin(email, password string) (*AdminUser, error) {
 	admin, err := s.queries.GetAdmin(context.Background(), email)
 	if err == sql.ErrNoRows {
