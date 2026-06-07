@@ -3,6 +3,7 @@ package models
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"text/template"
 	"time"
@@ -119,7 +120,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
 	content = replacer.Replace(content)
 
-	wrapperTmpl, _ := template.New("wrapper").Parse(emailWrapper)
+	wrapperTmpl, err := template.New("wrapper").Parse(emailWrapper)
+	if err != nil {
+		slog.Error("CRITICAL: Failed to parse hardcoded email wrapper", "error", err)
+		return content // Return raw content if wrapper fails
+	}
 	var buf bytes.Buffer
 	wrapperTmpl.Execute(&buf, struct {
 		Content string

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"rankinvite/internal/db"
 	"time"
 
@@ -67,7 +68,10 @@ func (s *AuthService) ListAdmins() ([]AdminUser, error) {
 	
 	results := make([]AdminUser, len(admins))
 	for i, a := range admins {
-		id, _ := uuid.Parse(a.ID)
+		id, err := uuid.Parse(a.ID)
+		if err != nil {
+			slog.Error("Data corruption: failed to parse admin UUID from database", "id", a.ID, "error", err)
+		}
 		results[i] = AdminUser{
 			ID:           id,
 			Email:        a.Email,
@@ -107,7 +111,10 @@ func (s *AuthService) VerifyAdmin(email, password string) (*AdminUser, error) {
 		return nil, nil // Invalid password
 	}
 
-	id, _ := uuid.Parse(admin.ID)
+	id, err := uuid.Parse(admin.ID)
+	if err != nil {
+		slog.Error("Data corruption: failed to parse admin UUID from database during login", "id", admin.ID, "error", err)
+	}
 	return &AdminUser{
 		ID:           id,
 		Email:        admin.Email,
