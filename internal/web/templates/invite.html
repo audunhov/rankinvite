@@ -6,55 +6,88 @@
 </head>
 <body class="container">
     <main style="max-width: 700px; margin: 60px auto;">
-        <div class="card" style="text-align: center;">
-            <h1 style="font-size: 3em; margin-bottom: 10px;">{{.Invitation.Title}}</h1>
-            
-            <div style="display: flex; justify-content: center; gap: 40px; margin: 30px 0; border-top: 3px solid black; border-bottom: 3px solid black; padding: 24px 0;">
-                {{if .Invitation.Location}}
-                <div>
-                    <strong style="text-transform: uppercase; font-size: 0.8em;">Sted</strong>
-                    <div style="font-weight: bold; margin-top: 8px;">{{.Invitation.Location}}</div>
-                </div>
-                {{end}}
-                {{if not .Invitation.StartTime.IsZero}}
-                <div>
-                    <strong style="text-transform: uppercase; font-size: 0.8em;">Når</strong>
-                    <div style="font-weight: bold; margin-top: 8px;">
-                        {{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}
-                        {{if not .Invitation.EndTime.IsZero}} - {{.Invitation.EndTime.Format "15:04"}}{{end}}
-                    </div>
-                </div>
-                {{end}}
-            </div>
-
-            {{if .Invitation.Description}}
-            <div style="text-align: left; margin-bottom: 40px;">
-                <strong style="text-transform: uppercase; font-size: 0.8em;">Beskrivelse</strong>
-                <p class="pre-wrap" style="margin-top: 12px; line-height: 1.6;">{{.Invitation.Description}}</p>
-            </div>
-            {{end}}
-
-            {{if eq .Invite.Status "accepted"}}
-                <div style="background: #00ff00; padding: 32px; border: 3px solid black; box-shadow: 8px 8px 0px 0px black; font-weight: bold; margin: 40px 0; font-size: 1.5em;">DU ER PÅMELDT! TAKK!</div>
-                {{if not .Invitation.StartTime.IsZero}}
-                <a href="/i/calendar/{{.Invite.ID}}" class="button" style="background: white; font-size: 1em;">LEGG TIL I KALENDER (.ICS)</a>
-                {{end}}
-            {{else if eq .Invite.Status "declined"}}
-                <div style="background: #ff0000; color: white; padding: 32px; border: 3px solid black; box-shadow: 8px 8px 0px black; font-weight: bold; margin: 40px 0; font-size: 1.5em;">DU HAR TAKKET NEI.</div>
-            {{else if eq .Invite.Status "timed_out"}}
-                <div style="background: #ff0000; color: white; padding: 32px; border: 3px solid black; box-shadow: 8px 8px 0px black; font-weight: bold; margin: 40px 0; font-size: 1.2em;">DENNE INVITASJONEN ER IKKE LENGER GYLDIG.</div>
-            {{else}}
-                <p style="font-size: 1.2em; margin: 40px 0;">Du er herved invitert. Det er <strong>{{.Invitation.Spots}}</strong> ledige plasser.</p>
-                
-                <form action="/i/action" method="POST" style="display: flex; flex-direction: column; gap: 24px;">
-                    <input type="hidden" name="invite_id" value="{{.Invite.ID}}">
-                    <button type="submit" name="action" value="accept" class="button btn-success" style="font-size: 1.8em; padding: 32px;">JEG VIL DELTA</button>
-                    <button type="submit" name="action" value="decline" class="button btn-danger" style="font-size: 1.2em; padding: 20px;">JEG KAN IKKE DELTA</button>
-                </form>
-                
-                <p style="margin-top: 48px; font-size: 0.9em; font-weight: bold; text-transform: uppercase; color: #666;">Svarfrist på dette tilbudet: {{.Invite.ExpiresAt.Format "02.01.2006 kl. 15:04"}}</p>
-            {{end}}
+        <div id="invite-card-container">
+            {{template "invite_content" .}}
         </div>
     </main>
 </body>
 </html>
+
+{{define "invite_content"}}
+    <div class="card" style="text-align: center;">
+        <h1 style="font-size: 3em; margin-bottom: 10px;">{{.Invitation.Title}}</h1>
+        
+        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin: 30px 0; border-top: 3px solid black; border-bottom: 3px solid black; padding: 24px 0;">
+            {{if .Invitation.Location}}
+            <div>
+                <strong style="text-transform: uppercase; font-size: 0.8em;">Sted</strong>
+                <div style="font-weight: bold; margin-top: 8px;">{{.Invitation.Location}}</div>
+            </div>
+            {{end}}
+            {{if not .Invitation.StartTime.IsZero}}
+            <div>
+                <strong style="text-transform: uppercase; font-size: 0.8em;">Når</strong>
+                <div style="font-weight: bold; margin-top: 8px;">
+                    {{.Invitation.StartTime.Format "02.01.2006 kl. 15:04"}}
+                    {{if not .Invitation.EndTime.IsZero}} - {{.Invitation.EndTime.Format "15:04"}}{{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+
+        {{if .Invitation.Description}}
+        <div style="text-align: left; margin-bottom: 40px;">
+            <strong style="text-transform: uppercase; font-size: 0.8em;">Beskrivelse</strong>
+            <p class="pre-wrap" style="margin-top: 12px; line-height: 1.6;">{{.Invitation.Description}}</p>
+        </div>
+        {{end}}
+
+        {{if eq .Invite.Status "accepted"}}
+            <div style="background: #00ff00; padding: 48px; border: 3px solid black; box-shadow: 12px 12px 0px 0px black; margin: 40px 0;">
+                <div style="font-size: 3em; margin-bottom: 10px;">✓</div>
+                <strong style="font-size: 1.8em; text-transform: uppercase;">Du er påmeldt!</strong>
+                <p style="margin-top: 15px;">Vi ses på {{.Invitation.Title}}.</p>
+            </div>
+            {{if not .Invitation.StartTime.IsZero}}
+            <a href="/i/calendar/{{.Invite.ID}}" class="button" style="background: white; font-size: 1em;">LEGG TIL I KALENDER (.ICS)</a>
+            {{end}}
+        {{else if eq .Invite.Status "declined"}}
+            <div style="background: #ff0000; color: white; padding: 48px; border: 3px solid black; box-shadow: 12px 12px 0px 0px black; margin: 40px 0;">
+                <div style="font-size: 3em; margin-bottom: 10px;">✕</div>
+                <strong style="font-size: 1.8em; text-transform: uppercase;">Du har takket nei.</strong>
+                <p style="margin-top: 15px;">Takk for at du ga beskjed!</p>
+            </div>
+        {{else if eq .Invite.Status "timed_out"}}
+            <div style="background: #eee; padding: 48px; border: 3px solid black; box-shadow: 12px 12px 0px 0px black; margin: 40px 0;">
+                <div style="font-size: 3em; margin-bottom: 10px;">⌛</div>
+                {{if eq .Invitation.Spots 0}}
+                    <strong style="font-size: 1.5em; text-transform: uppercase;">Beklager, det er nå fullbooket.</strong>
+                    <p style="margin-top: 15px;">Alle plasser er dessverre tatt.</p>
+                {{else}}
+                    <strong style="font-size: 1.5em; text-transform: uppercase;">Invitasjonen har utløpt.</strong>
+                    <p style="margin-top: 15px;">Svarfristen for dette tilbudet er over.</p>
+                {{end}}
+            </div>
+        {{else}}
+            <p style="font-size: 1.2em; margin: 40px 0;">
+                Du er herved invitert. 
+                {{if gt .Invitation.Spots 1}} Det er <strong>{{.Invitation.Spots}}</strong> ledige plasser.{{else}} Det er kun <strong>1</strong> ledig plass igjen!{{end}}
+            </p>
+            
+            <div style="display: flex; flex-direction: column; gap: 24px;">
+                <button hx-post="/i/action?invite_id={{.Invite.ID}}&action=accept" 
+                        hx-target="#invite-card-container"
+                        class="button btn-success" style="font-size: 1.8em; padding: 32px;">JEG VIL DELTA</button>
+                
+                <button hx-post="/i/action?invite_id={{.Invite.ID}}&action=reject" 
+                        hx-target="#invite-card-container"
+                        hx-confirm="Sikker på at du vil takke nei til denne invitasjonen?"
+                        class="button btn-danger" style="font-size: 1.2em; padding: 20px;">JEG KAN IKKE DELTA</button>
+            </div>
+            
+            <p style="margin-top: 48px; font-size: 0.9em; font-weight: bold; text-transform: uppercase; color: #666;">
+                Svarfrist på dette tilbudet: {{.Invite.ExpiresAt.Format "02.01.2006 kl. 15:04"}}
+            </p>
+        {{end}}
+    </div>
+{{end}}

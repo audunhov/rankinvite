@@ -711,10 +711,12 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 
 	allInvs, _ := s.repo.List(1000, 0)
 	var targetInv *models.Invitation
+	var foundPersonalInvite *models.PersonalInvite
 	for _, inv := range allInvs {
-		for _, pi := range inv.PersonalInvites {
-			if pi.ID == inviteID {
+		for i := range inv.PersonalInvites {
+			if inv.PersonalInvites[i].ID == inviteID {
 				targetInv = inv
+				foundPersonalInvite = &inv.PersonalInvites[i]
 				break
 			}
 		}
@@ -741,6 +743,14 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	if s.worker != nil {
 		slog.Debug("Dispatching events to worker", "id", targetInv.ID, "count", len(events))
 		s.worker.ProcessEvents(events, targetInv)
+	}
+
+	if r.Header.Get("HX-Request") == "true" {
+		s.templates.ExecuteTemplate(w, "invite_content", PageData{
+			Invitation: targetInv,
+			Invite:     foundPersonalInvite,
+		})
+		return
 	}
 
 	// Redirect back to see updated status
