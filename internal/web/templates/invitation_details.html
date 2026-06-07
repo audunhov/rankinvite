@@ -9,6 +9,8 @@
         <a href="/admin" class="back-link">← TILBAKE TIL DASHBOARD</a>
     </header>
 
+    {{template "flash_messages" .}}
+
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
         <h1>{{.Invitation.Title}}</h1>
         <div>

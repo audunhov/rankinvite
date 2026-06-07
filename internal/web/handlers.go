@@ -111,6 +111,8 @@ type PageData struct {
 	PastEmails           []string
 	DefaultEmailTemplate string
 	Error                string
+	FlashMessage         string
+	FlashType            string // "success" or "error"
 	CSRFToken            string
 	Page                 int
 	TotalPages           int
@@ -118,11 +120,39 @@ type PageData struct {
 	HasPrev              bool
 }
 
+func (s *Server) setFlash(w http.ResponseWriter, message, flashType string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     "flash_message",
+		Value:    message,
+		Path:     "/",
+		HttpOnly: true,
+	})
+	http.SetCookie(w, &http.Cookie{
+		Name:     "flash_type",
+		Value:    flashType,
+		Path:     "/",
+		HttpOnly: true,
+	})
+}
+
 func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, data PageData) {
 	if session, ok := r.Context().Value(sessionKey).(*auth.Session); ok {
 		data.CSRFToken = session.CSRFToken
 		data.CurrentEmail = session.Email
 	}
+
+	// Handle flash messages
+	if cookie, err := r.Cookie("flash_message"); err == nil {
+		data.FlashMessage = cookie.Value
+		// Clear cookie
+		http.SetCookie(w, &http.Cookie{Name: "flash_message", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	}
+	if cookie, err := r.Cookie("flash_type"); err == nil {
+		data.FlashType = cookie.Value
+		// Clear cookie
+		http.SetCookie(w, &http.Cookie{Name: "flash_type", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
+	}
+
 	err := s.templates.ExecuteTemplate(w, name, data)
 	if err != nil {
 		slog.Error("Template error", "name", name, "error", err)
@@ -263,6 +293,7 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	s.setFlash(w, "Ny invitasjon opprettet!", "success")
 	http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s", inv.ID), http.StatusSeeOther)
 }
 
@@ -732,6 +763,7 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	template := r.FormValue("default_email_template")
 	s.repo.UpdateSetting("default_email_template", template)
 
+	s.setFlash(w, "Innstillingene ble lagret!", "success")
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
 }
 
