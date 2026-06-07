@@ -47,12 +47,6 @@ const emailWrapper = `<!DOCTYPE html>
         <div style="margin: 40px 0;">
             <a href="{{.URL}}" class="button">SVAR PÅ INVITASJON</a>
         </div>
-        {{if .Location}}
-        <div style="border-top: 4px solid black; padding-top: 20px; margin-top: 40px;">
-            <strong>STED:</strong> {{.Location}}
-        </div>
-        {{end}}
-        <div class="footer">Sendt via RankInvite System</div>
     </div>
 </body>
 </html>`
@@ -94,13 +88,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	wrapperTmpl, _ := template.New("wrapper").Parse(emailWrapper)
 	var buf bytes.Buffer
 	wrapperTmpl.Execute(&buf, struct {
-		Content  string
-		URL      string
-		Location string
+		Content string
+		URL     string
 	}{
-		Content:  content,
-		URL:      url,
-		Location: i.Location,
+		Content: content,
+		URL:     url,
 	})
 
 	return buf.String()
