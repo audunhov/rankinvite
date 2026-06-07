@@ -12,7 +12,10 @@
     <h1>Innstillinger</h1>
 
     <div class="card">
-        <h2>Standard e-postmal</h2>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2 style="margin: 0;">Standard e-postmal</h2>
+            <a href="/admin/settings/preview" target="_blank" class="button" style="padding: 8px 16px; font-size: 0.8em;">FORHÅNDSVIS</a>
+        </div>
         <p style="margin-bottom: 20px; font-size: 0.9em;">Denne teksten fylles automatisk inn når du oppretter et nytt arrangement.</p>
         
         <form action="/admin/settings/update" method="POST">

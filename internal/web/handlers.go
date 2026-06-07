@@ -99,6 +99,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 
 	mux.HandleFunc("/admin/settings", admin(s.handleSettings))
 	mux.HandleFunc("/admin/settings/update", admin(s.handleUpdateSettings))
+	mux.HandleFunc("/admin/settings/preview", admin(s.handlePreviewDefaultTemplate))
 }
 
 type PageData struct {
@@ -732,6 +733,25 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	s.repo.UpdateSetting("default_email_template", template)
 
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+}
+
+func (s *Server) handlePreviewDefaultTemplate(w http.ResponseWriter, r *http.Request) {
+	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+
+	// Create a dummy invitation to use the RenderEmailBody logic
+	dummyInv := &models.Invitation{
+		Title:               "Eksempel: Debatt i NRK",
+		Location:            "Marienlyst, Oslo",
+		StartTime:           time.Now().Add(24 * time.Hour),
+		EndTime:             time.Now().Add(26 * time.Hour),
+		Description:         "Dette er en eksempelbeskrivelse for å vise hvordan e-posten vil se ut med dine variabler.",
+		CustomEmailTemplate: defaultTemplate,
+	}
+
+	dummyID := uuid.New()
+	html := dummyInv.RenderEmailBody(dummyID, s.baseURL)
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(html))
 }
 
 func (s *Server) csrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
