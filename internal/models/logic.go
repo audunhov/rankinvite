@@ -13,42 +13,13 @@ import (
 
 const emailWrapper = `<!DOCTYPE html>
 <html>
-<head>
-    <meta charset="UTF-8">
-    <style>
-        body { margin: 0; padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f0f0f0; }
-        .card { 
-            background-color: white; 
-            border: 4px solid black; 
-            padding: 40px; 
-            box-shadow: 12px 12px 0px 0px rgba(0,0,0,1); 
-            max-width: 600px; 
-            margin: 0 auto; 
-        }
-        h1 { font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px; }
-        .content { font-size: 18px; line-height: 1.6; margin: 24px 0; }
-        .button { 
-            display: inline-block; 
-            background-color: #00ff00; 
-            color: black; 
-            text-decoration: none; 
-            padding: 20px 40px; 
-            font-weight: bold; 
-            border: 4px solid black; 
-            box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); 
-            text-transform: uppercase; 
-            font-size: 20px;
-        }
-        .footer { margin-top: 40px; font-size: 14px; text-transform: uppercase; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <div class="card">
-        <h1>{{.Header}}</h1>
-        <div class="content">{{.Content}}</div>
+<body style="margin: 0; padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f0f0f0;">
+    <div style="background-color: white; border: 4px solid black; padding: 40px; box-shadow: 12px 12px 0px 0px rgba(0,0,0,1); max-width: 600px; margin: 0 auto;">
+        <h1 style="font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px;">{{.Header}}</h1>
+        <div style="font-size: 18px; line-height: 1.6; margin: 24px 0;">{{.Content}}</div>
         {{if .URL}}
         <div style="margin: 40px 0;">
-            <a href="{{.URL}}" class="button">{{.ButtonText}}</a>
+            <a href="{{.URL}}" style="display: inline-block; background-color: #00ff00; color: black; text-decoration: none; padding: 20px 40px; font-weight: bold; border: 4px solid black; box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); text-transform: uppercase; font-size: 20px;">{{.ButtonText}}</a>
         </div>
         {{end}}
     </div>
@@ -101,6 +72,7 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				Duration    string
 				Description string
 				Deadline    string
+				URL         string
 			}{
 				Title:       i.Title,
 				Location:    i.Location,
@@ -109,6 +81,7 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 				Duration:    durationStr,
 				Description: i.Description,
 				Deadline:    deadlineStr,
+				URL:         url,
 			}
 			tmpl.Execute(&buf, data)
 			content = buf.String()

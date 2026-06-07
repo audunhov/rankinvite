@@ -12,6 +12,7 @@ import (
 	"rankinvite/internal/storage"
 	"rankinvite/internal/web"
 	"rankinvite/internal/worker"
+	"strings"
 
 	"github.com/pressly/goose/v3"
 	_ "modernc.org/sqlite"
@@ -62,6 +63,7 @@ func main() {
 	if baseURL == "" {
 		baseURL = "http://localhost:" + port
 	}
+	baseURL = strings.TrimSuffix(baseURL, "/")
 
 	// Initialize Web Server
 	mux := http.NewServeMux()
