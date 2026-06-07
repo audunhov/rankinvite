@@ -86,11 +86,17 @@ func (s *Server) RecoverMiddleware(next http.Handler) http.Handler {
 
 func (s *Server) SetupMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Only check for setup on non-setup paths
+		if r.URL.Path == "/setup" || r.URL.Path == "/setup/post" || strings.HasPrefix(r.URL.Path, "/i/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		admins, err := s.auth.ListAdmins()
 		if err != nil {
 			slog.Error("Failed to check admins for setup", "error", err)
 		}
-		if len(admins) == 0 && r.URL.Path != "/setup" && r.URL.Path != "/setup/post" {
+		if len(admins) == 0 {
 			http.Redirect(w, r, "/setup", http.StatusSeeOther)
 			return
 		}
@@ -136,17 +142,6 @@ func (s *Server) CSRFMiddleware(next http.Handler) http.Handler {
 }
 
 func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
-	// Public routes
-	mux.HandleFunc("/i/", s.handlePersonalInvite)
-	mux.HandleFunc("/i/action", s.handleInviteAction)
-	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
-
-	mux.HandleFunc("/login", s.handleLogin)
-	mux.HandleFunc("/logout", s.handleLogout)
-
-	mux.HandleFunc("/setup", s.handleSetup)
-	mux.HandleFunc("/setup/post", s.handlePostSetup)
-
 	// Root redirect
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -156,36 +151,50 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 	})
 
-	// Admin routes
-	mux.Handle("/admin", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleAdminDashboard))))
-	mux.Handle("/admin/invitations/new", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleNewInvitation))))
-	mux.Handle("/admin/invitations/edit", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleEditInvitation))))
-	mux.Handle("/admin/invitations/update", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateInvitation))))
-	mux.Handle("/admin/invitations", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateInvitation))))
-	mux.Handle("/admin/invitations/", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleInvitationDetails))))
-	mux.Handle("/admin/invitations/action", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleAdminInvitationAction))))
-	mux.Handle("/admin/invitations/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteInvitation))))
-	mux.Handle("/admin/invitations/strategies", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateStrategy))))
-	mux.Handle("/admin/invitations/strategies/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteStrategy))))
-	mux.Handle("/admin/invitations/status", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleInvitationStatusPartial))))
-	mux.Handle("/admin/invitations/update_template", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateEmailTemplate))))
-	mux.Handle("/admin/invitations/preview", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handlePreviewEmail))))
+	// Public Invitation routes
+	mux.HandleFunc("/i/", s.handlePersonalInvite)
+	mux.HandleFunc("/i/action", s.handleInviteAction)
+	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
 
-	mux.Handle("/admin/users", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleListUsers))))
-	mux.Handle("/admin/users/create", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateUser))))
-	mux.Handle("/admin/users/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteUser))))
-	mux.Handle("/admin/users/change-password", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleChangePassword))))
+	// Auth & Setup
+	mux.HandleFunc("/login", s.handleLogin)
+	mux.HandleFunc("/logout", s.handleLogout)
+	mux.HandleFunc("/setup", s.handleSetup)
+	mux.HandleFunc("/setup/post", s.handlePostSetup)
 
-	mux.Handle("/admin/invitations/subscribe", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleSubscribe))))
-	mux.Handle("/admin/invitations/unsubscribe", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUnsubscribe))))
+	// Protected Admin routes helper
+	admin := func(h http.HandlerFunc) http.Handler {
+		return s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(h)))
+	}
 
-	mux.Handle("/admin/settings", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleSettings))))
-	mux.Handle("/admin/settings/update", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateSettings))))
-	mux.Handle("/admin/settings/preview", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handlePreviewDefaultTemplate))))
+	mux.Handle("/admin", admin(s.handleAdminDashboard))
+	mux.Handle("/admin/invitations/new", admin(s.handleNewInvitation))
+	mux.Handle("/admin/invitations/edit", admin(s.handleEditInvitation))
+	mux.Handle("/admin/invitations/update", admin(s.handleUpdateInvitation))
+	mux.Handle("/admin/invitations", admin(s.handleCreateInvitation))
+	mux.Handle("/admin/invitations/", admin(s.handleInvitationDetails))
+	mux.Handle("/admin/invitations/action", admin(s.handleAdminInvitationAction))
+	mux.Handle("/admin/invitations/delete", admin(s.handleDeleteInvitation))
+	mux.Handle("/admin/invitations/strategies", admin(s.handleCreateStrategy))
+	mux.Handle("/admin/invitations/strategies/delete", admin(s.handleDeleteStrategy))
+	mux.Handle("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
+	mux.Handle("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
+	mux.Handle("/admin/invitations/preview", admin(s.handlePreviewEmail))
 
-	// Wrap the entire stack
-	stack := s.SetupMiddleware(s.RecoverMiddleware(mux))
-	return stack
+	mux.Handle("/admin/users", admin(s.handleListUsers))
+	mux.Handle("/admin/users/create", admin(s.handleCreateUser))
+	mux.Handle("/admin/users/delete", admin(s.handleDeleteUser))
+	mux.Handle("/admin/users/change-password", admin(s.handleChangePassword))
+
+	mux.Handle("/admin/invitations/subscribe", admin(s.handleSubscribe))
+	mux.Handle("/admin/invitations/unsubscribe", admin(s.handleUnsubscribe))
+
+	mux.Handle("/admin/settings", admin(s.handleSettings))
+	mux.Handle("/admin/settings/update", admin(s.handleUpdateSettings))
+	mux.Handle("/admin/settings/preview", admin(s.handlePreviewDefaultTemplate))
+
+	// Global stack
+	return s.RecoverMiddleware(s.SetupMiddleware(mux))
 }
 
 type PageData struct {
