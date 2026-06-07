@@ -45,10 +45,30 @@
 
 {{define "variables_list"}}
 <div class="variables-info">
-    <strong style="font-size: 0.8em; text-transform: uppercase; display: block; margin-bottom: 10px;">Tilgjengelige variabler</strong>
-    <span class="variable-tag">{{`{{.Title}}`}}</span>
-    <span class="variable-tag">{{`{{.URL}}`}}</span>
-    <span class="variable-tag">{{`{{.Location}}`}}</span>
-    <p style="font-size: 0.7em; margin-top: 10px; font-weight: bold;">(Kopier og lim inn disse i malen din)</p>
+    <strong style="font-size: 0.8em; text-transform: uppercase; display: block; margin-bottom: 10px;">Tilgjengelige variabler (Klikk for å sette inn)</strong>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.Title}}`}}')">{{`{{.Title}}`}}</span>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.URL}}`}}')">{{`{{.URL}}`}}</span>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.Location}}`}}')">{{`{{.Location}}`}}</span>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.StartTime}}`}}')">{{`{{.StartTime}}`}}</span>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.Description}}`}}')">{{`{{.Description}}`}}</span>
+    <span class="variable-tag" onclick="insertVariable('{{`{{.Spots}}`}}')">{{`{{.Spots}}`}}</span>
+    <p style="font-size: 0.7em; margin-top: 10px; font-weight: bold;">(Kopier eller klikk på disse for å legge dem i malen din)</p>
 </div>
+<script>
+function insertVariable(variable) {
+    const textarea = document.querySelector('textarea[name="email_template"]') || 
+                     document.querySelector('textarea[name="default_email_template"]');
+    if (!textarea) return;
+    
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const before = text.substring(0, start);
+    const after = text.substring(end, text.length);
+    
+    textarea.value = before + variable + after;
+    textarea.selectionStart = textarea.selectionEnd = start + variable.length;
+    textarea.focus();
+}
+</script>
 {{end}}

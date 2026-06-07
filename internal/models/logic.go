@@ -68,13 +68,19 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 		if err == nil {
 			var buf bytes.Buffer
 			data := struct {
-				Title    string
-				URL      string
-				Location string
+				Title       string
+				URL         string
+				Location    string
+				StartTime   string
+				Description string
+				Spots       int
 			}{
-				Title:    i.Title,
-				URL:      url,
-				Location: i.Location,
+				Title:       i.Title,
+				URL:         url,
+				Location:    i.Location,
+				StartTime:   i.StartTime.Format("02.01.2006 15:04"),
+				Description: i.Description,
+				Spots:       i.Spots,
 			}
 			tmpl.Execute(&buf, data)
 			content = buf.String()
