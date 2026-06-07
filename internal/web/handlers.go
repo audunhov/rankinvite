@@ -94,6 +94,15 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/setup", recoverMiddleware(http.HandlerFunc(s.handleSetup)))
 	mux.HandleFunc("/setup/post", recoverMiddleware(http.HandlerFunc(s.handlePostSetup)))
 
+	// Root redirect
+	mux.HandleFunc("/", recoverMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
+	})))
+
 	// Protected Admin Routes
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
 		return recoverMiddleware(s.setupMiddleware(s.requireAdmin(s.csrfMiddleware(h))))
