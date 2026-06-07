@@ -14,6 +14,7 @@ import (
 	"rankinvite/internal/auth"
 	"rankinvite/internal/models"
 	"rankinvite/internal/storage"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -320,6 +321,12 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.Location = r.FormValue("location")
 	inv.Description = r.FormValue("description")
 	
+	if inv.Title == "" {
+		s.setFlash(w, "Tittel kan ikke være tom", "error")
+		http.Redirect(w, r, "/admin/invitations/edit?id="+idStr, http.StatusSeeOther)
+		return
+	}
+
 	if stStr := r.FormValue("start_time"); stStr != "" {
 		t, err := time.Parse("2006-01-02T15:04", stStr)
 		if err == nil {
@@ -341,7 +348,11 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 		inv.EndTime = time.Time{}
 	}
 
-	fmt.Sscanf(r.FormValue("spots"), "%d", &inv.Spots)
+	if _, err := fmt.Sscanf(r.FormValue("spots"), "%d", &inv.Spots); err != nil || inv.Spots < 1 {
+		s.setFlash(w, "Antall plasser må være minst 1", "error")
+		http.Redirect(w, r, "/admin/invitations/edit?id="+idStr, http.StatusSeeOther)
+		return
+	}
 
 	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to update invitation", "error", err)
@@ -363,6 +374,12 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	location := r.FormValue("location")
 	description := r.FormValue("description")
 	
+	if title == "" {
+		s.setFlash(w, "Tittel kan ikke være tom", "error")
+		http.Redirect(w, r, "/admin/invitations/new", http.StatusSeeOther)
+		return
+	}
+	
 	var startTime, endTime time.Time
 	if stStr := r.FormValue("start_time"); stStr != "" {
 		t, err := time.Parse("2006-01-02T15:04", stStr)
@@ -382,7 +399,11 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var spots int
-	fmt.Sscanf(r.FormValue("spots"), "%d", &spots)
+	if _, err := fmt.Sscanf(r.FormValue("spots"), "%d", &spots); err != nil || spots < 1 {
+		s.setFlash(w, "Antall plasser må være minst 1", "error")
+		http.Redirect(w, r, "/admin/invitations/new", http.StatusSeeOther)
+		return
+	}
 
 	defaultTemplate, err := s.repo.GetSetting("default_email_template")
 	if err != nil {
@@ -621,10 +642,20 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	}
 	
 	stratType := models.StrategyType(r.FormValue("type"))
+	if stratType != models.StrategyPriorityList && stratType != models.StrategyFCFS {
+		http.Error(w, "Ugyldig strategitype", http.StatusBadRequest)
+		return
+	}
+
 	var participants []string
 	if err := json.Unmarshal([]byte(r.FormValue("participants_json")), &participants); err != nil {
 		slog.Error("Failed to unmarshal participants list", "error", err)
 		http.Error(w, "Ugyldig deltakerliste", http.StatusBadRequest)
+		return
+	}
+	if len(participants) == 0 {
+		s.setFlash(w, "Du må legge til minst én deltaker", "error")
+		http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s/strategies/new", idStr), http.StatusSeeOther)
 		return
 	}
 	
@@ -636,8 +667,10 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	var inviteDuration time.Duration
 	var totalDuration time.Duration
 	var mins int
-	if _, err := fmt.Sscanf(r.FormValue("duration_mins"), "%d", &mins); err != nil {
-		slog.Warn("Invalid duration format", "value", r.FormValue("duration_mins"), "error", err)
+	if _, err := fmt.Sscanf(r.FormValue("duration_mins"), "%d", &mins); err != nil || mins < 1 {
+		s.setFlash(w, "Tidsfrist må være minst 1 minutt", "error")
+		http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s/strategies/new", idStr), http.StatusSeeOther)
+		return
 	}
 	
 	if stratType == models.StrategyPriorityList {
@@ -808,6 +841,17 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
+	if email == "" || !strings.Contains(email, "@") {
+		s.setFlash(w, "Ugyldig e-postadresse", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+	if len(password) < 6 {
+		s.setFlash(w, "Passordet må være minst 6 tegn", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
+
 	if err := s.auth.CreateAdmin(email, password); err != nil {
 		slog.Error("Failed to create admin", "email", email, "error", err)
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
@@ -859,6 +903,12 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	currentPassword := r.FormValue("current_password")
 	newPassword := r.FormValue("new_password")
 	confirmPassword := r.FormValue("confirm_password")
+
+	if len(newPassword) < 6 {
+		s.setFlash(w, "Nytt passord må være minst 6 tegn", "error")
+		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		return
+	}
 
 	if newPassword != confirmPassword {
 		s.setFlash(w, "Nye passord samsvarer ikke", "error")
