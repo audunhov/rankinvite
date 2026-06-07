@@ -111,6 +111,8 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 	smtpPass, _ := w.repo.GetSetting("smtp_pass")
 	globalSenderEmail, _ := w.repo.GetSetting("global_sender_email")
 
+	htmlBody := models.RenderGenericEmail("RANKINVITE VARSEL", body, "", "")
+
 	for _, recipient := range subscribers {
 		from := globalSenderEmail
 		to := []string{recipient}
@@ -121,8 +123,6 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body string) {
 		header["Subject"] = subject
 		header["MIME-Version"] = "1.0"
 		header["Content-Type"] = "text/html; charset=\"utf-8\""
-
-		htmlBody := fmt.Sprintf(`<!DOCTYPE html><html><body style="font-family: monospace; padding: 20px; border: 4px solid black;"><h1>RANKINVITE VARSEL</h1><p>%s</p></body></html>`, body)
 
 		message := ""
 		for k, v := range header {

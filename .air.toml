@@ -26,6 +26,11 @@ tmp_dir = "tmp"
   runner = "green"
   watcher = "cyan"
 
+[proxy]
+enabled = true
+proxy_port = 8090
+app_port = 8081
+
 [log]
   time = false
 

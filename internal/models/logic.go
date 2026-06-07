@@ -44,11 +44,13 @@ const emailWrapper = `<!DOCTYPE html>
 </head>
 <body>
     <div class="card">
-        <h1>Invitasjon til {{.Title}}</h1>
+        <h1>{{.Header}}</h1>
         <div class="content">{{.Content}}</div>
+        {{if .URL}}
         <div style="margin: 40px 0;">
-            <a href="{{.URL}}" class="button">SVAR PÅ INVITASJON</a>
+            <a href="{{.URL}}" class="button">{{.ButtonText}}</a>
         </div>
+        {{end}}
     </div>
 </body>
 </html>`
@@ -126,13 +128,41 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	}
 	var buf bytes.Buffer
 	wrapperTmpl.Execute(&buf, struct {
-		Content string
-		URL     string
-		Title   string
+		Header     string
+		Content    string
+		URL        string
+		ButtonText string
 	}{
-		Content: content,
-		URL:     url,
-		Title:   i.Title,
+		Header:     "Invitasjon til " + i.Title,
+		Content:    content,
+		URL:        url,
+		ButtonText: "SVAR PÅ INVITASJON",
+	})
+
+	return buf.String()
+}
+
+func RenderGenericEmail(header, content, url, buttonText string) string {
+	// Clean up newlines
+	replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
+	content = replacer.Replace(content)
+
+	wrapperTmpl, err := template.New("wrapper").Parse(emailWrapper)
+	if err != nil {
+		slog.Error("CRITICAL: Failed to parse hardcoded email wrapper", "error", err)
+		return content
+	}
+	var buf bytes.Buffer
+	wrapperTmpl.Execute(&buf, struct {
+		Header     string
+		Content    string
+		URL        string
+		ButtonText string
+	}{
+		Header:     header,
+		Content:    content,
+		URL:        url,
+		ButtonText: buttonText,
 	})
 
 	return buf.String()
