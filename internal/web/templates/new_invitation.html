@@ -25,9 +25,12 @@
                 <label>Avsender</label>
                 <select name="sender" required>
                     <optgroup label="Din personlige profil">
-                        <option value="me">{{.AdminName}} <{{.CurrentEmail}}></option>
+                        <option value="me" {{if not .IsAdminEmailAllowed}}disabled{{end}}>
+                            {{.AdminName}} <{{.CurrentEmail}}>
+                            {{if not .IsAdminEmailAllowed}} (Ikke tillatt domene: {{.AllowedDomain}}){{end}}
+                        </option>
                     </optgroup>
-                    {{if .SharedSenders}}
+                    {{if .SharedSendersList}}
                     <optgroup label="Felles avsendere">
                         {{range .SharedSendersList}}
                         <option value="{{.}}">{{.}}</option>
@@ -38,6 +41,9 @@
                         <option value="system">{{.GlobalSenderName}} <{{.GlobalSenderEmail}}></option>
                     </optgroup>
                 </select>
+                {{if not .IsAdminEmailAllowed}}
+                <p style="font-size: 0.7em; color: #666; margin-top: 5px;">* Din e-postadresse har et annet domene enn systemet er konfigurert for. Du kan derfor ikke bruke din personlige adresse som avsender for å sikre at e-postene kommer frem.</p>
+                {{end}}
             </div>
 
             <div class="form-group">

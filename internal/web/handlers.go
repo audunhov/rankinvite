@@ -215,6 +215,8 @@ type PageData struct {
 	SharedSendersList    []string
 	AdminName            string
 	IsSubscribed         bool
+	IsAdminEmailAllowed  bool
+	AllowedDomain        string
 	Error                string
 	FlashMessage         string
 	FlashType            string // "success" or "error"
@@ -281,8 +283,11 @@ func (s *Server) handlePostSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 2. Save SMTP Settings
-	s.repo.UpdateSetting("global_sender_name", r.FormValue("global_sender_name"))
-	s.repo.UpdateSetting("global_sender_email", r.FormValue("global_sender_email"))
+	globalSenderName := r.FormValue("global_sender_name")
+	globalSenderEmail := r.FormValue("global_sender_email")
+
+	s.repo.UpdateSetting("global_sender_name", globalSenderName)
+	s.repo.UpdateSetting("global_sender_email", globalSenderEmail)
 	s.repo.UpdateSetting("smtp_host", r.FormValue("smtp_host"))
 	s.repo.UpdateSetting("smtp_port", r.FormValue("smtp_port"))
 	s.repo.UpdateSetting("smtp_user", r.FormValue("smtp_user"))
@@ -431,6 +436,16 @@ func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
 	globalName, _ := s.repo.GetSetting("global_sender_name")
 	globalEmail, _ := s.repo.GetSetting("global_sender_email")
 	sharedSenders, _ := s.repo.GetSetting("shared_senders")
+
+	allowedDomain := ""
+	if idx := strings.Index(globalEmail, "@"); idx != -1 {
+		allowedDomain = globalEmail[idx+1:]
+	}
+
+	isAdminEmailAllowed := false
+	if allowedDomain != "" && strings.HasSuffix(session.Email, "@"+allowedDomain) {
+		isAdminEmailAllowed = true
+	}
 	
 	var sharedList []string
 	for _, line := range strings.Split(sharedSenders, "\n") {
@@ -440,11 +455,13 @@ func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.render(w, r, "new_invitation.html", PageData{
-		AdminName:         adminName,
-		GlobalSenderName:  globalName,
-		GlobalSenderEmail: globalEmail,
-		SharedSenders:     sharedSenders,
-		SharedSendersList: sharedList,
+		AdminName:           adminName,
+		GlobalSenderName:    globalName,
+		GlobalSenderEmail:   globalEmail,
+		SharedSenders:       sharedSenders,
+		SharedSendersList:   sharedList,
+		IsAdminEmailAllowed: isAdminEmailAllowed,
+		AllowedDomain:       allowedDomain,
 	})
 }
 
@@ -1283,14 +1300,47 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.repo.UpdateSetting("default_email_template", r.FormValue("default_email_template"))
-	s.repo.UpdateSetting("global_sender_name", r.FormValue("global_sender_name"))
-	s.repo.UpdateSetting("global_sender_email", r.FormValue("global_sender_email"))
+	defaultTemplate := r.FormValue("default_email_template")
+	globalSenderName := r.FormValue("global_sender_name")
+	globalSenderEmail := r.FormValue("global_sender_email")
+	sharedSenders := r.FormValue("shared_senders")
+
+	// Extract domain
+	allowedDomain := ""
+	if idx := strings.Index(globalSenderEmail, "@"); idx != -1 {
+		allowedDomain = globalSenderEmail[idx+1:]
+	}
+
+	// Validate shared senders
+	if allowedDomain != "" {
+		lines := strings.Split(sharedSenders, "\n")
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				continue
+			}
+			// Extract email from "Name <email@domain.com>" or just "email@domain.com"
+			email := line
+			if idx := strings.Index(line, "<"); idx != -1 && strings.HasSuffix(line, ">") {
+				email = line[idx+1 : len(line)-1]
+			}
+			
+			if !strings.HasSuffix(email, "@"+allowedDomain) {
+				s.setFlash(w, fmt.Sprintf("Ugyldig delt avsender: '%s' må tilhøre domenet %s", email, allowedDomain), "error")
+				http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+				return
+			}
+		}
+	}
+
+	s.repo.UpdateSetting("default_email_template", defaultTemplate)
+	s.repo.UpdateSetting("global_sender_name", globalSenderName)
+	s.repo.UpdateSetting("global_sender_email", globalSenderEmail)
 	s.repo.UpdateSetting("smtp_host", r.FormValue("smtp_host"))
 	s.repo.UpdateSetting("smtp_port", r.FormValue("smtp_port"))
 	s.repo.UpdateSetting("smtp_user", r.FormValue("smtp_user"))
 	s.repo.UpdateSetting("smtp_pass", r.FormValue("smtp_pass"))
-	s.repo.UpdateSetting("shared_senders", r.FormValue("shared_senders"))
+	s.repo.UpdateSetting("shared_senders", sharedSenders)
 
 	s.setFlash(w, "Innstillingene ble lagret!", "success")
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
