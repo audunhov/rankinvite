@@ -6,6 +6,7 @@
 # Directories
 /tmp/
 /bin/
+/data/
 
 # Databases
 /*.db
