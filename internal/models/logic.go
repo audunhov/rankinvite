@@ -62,6 +62,20 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 		tmpl, err := template.New("email").Parse(i.CustomEmailTemplate)
 		if err == nil {
 			var buf bytes.Buffer
+			
+			startTimeStr := ""
+			if !i.StartTime.IsZero() {
+				startTimeStr = i.StartTime.Format("02.01.2006 15:04")
+			}
+			endTimeStr := ""
+			if !i.EndTime.IsZero() {
+				endTimeStr = i.EndTime.Format("15:04")
+			}
+			durationStr := ""
+			if !i.StartTime.IsZero() && !i.EndTime.IsZero() {
+				durationStr = i.EndTime.Sub(i.StartTime).String()
+			}
+
 			data := struct {
 				Title       string
 				Location    string
@@ -72,9 +86,9 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 			}{
 				Title:       i.Title,
 				Location:    i.Location,
-				StartTime:   i.StartTime.Format("02.01.2006 15:04"),
-				EndTime:     i.EndTime.Format("15:04"),
-				Duration:    i.EndTime.Sub(i.StartTime).String(),
+				StartTime:   startTimeStr,
+				EndTime:     endTimeStr,
+				Duration:    durationStr,
 				Description: i.Description,
 			}
 			tmpl.Execute(&buf, data)
