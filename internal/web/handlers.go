@@ -158,9 +158,12 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.HandleFunc("/i/action", s.handleInviteAction)
 	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
 
-	// Auth & Setup
+	// Auth & Setup (using trailing slashes to handle both /path and /path/)
+	mux.Handle("/login/", http.HandlerFunc(s.handleLogin))
 	mux.HandleFunc("/login", s.handleLogin)
+	mux.Handle("/logout/", http.HandlerFunc(s.handleLogout))
 	mux.HandleFunc("/logout", s.handleLogout)
+	mux.Handle("/setup/", http.HandlerFunc(s.handleSetup))
 	mux.HandleFunc("/setup", s.handleSetup)
 	mux.HandleFunc("/setup/post", s.handlePostSetup)
 
