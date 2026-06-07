@@ -67,7 +67,7 @@
                             <td><strong>{{.AcceptedCount}}</strong></td>
                             <td>{{.PendingCount}}</td>
                             <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
-                            <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                            <td>{{if .CreatedAt.IsZero}}-{{else}}{{.CreatedAt.Format "02.01.2006"}}{{end}}</td>
                             <td>
                                 <div style="display: flex; gap: 10px; align-items: center;">
                                     <a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a>

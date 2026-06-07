@@ -73,6 +73,7 @@ func NewInvitation(title string, spots int) *Invitation {
 		Spots:           spots,
 		Status:          StatusDraft,
 		PersonalInvites: []PersonalInvite{},
+		CreatedAt:       time.Now(),
 	}
 }
 
