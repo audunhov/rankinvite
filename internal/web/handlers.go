@@ -70,16 +70,29 @@ func (s *Server) SetBaseURL(u string) {
 }
 
 func (s *Server) RegisterHandlers(mux *http.ServeMux) {
-	mux.HandleFunc("/i/", s.handlePersonalInvite)
-	mux.HandleFunc("/i/action", s.handleInviteAction)
-	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
-	
-	mux.HandleFunc("/login", s.handleLogin)
-	mux.HandleFunc("/logout", s.handleLogout)
-	
+	// Recover Middleware
+	recoverMiddleware := func(next http.Handler) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if err := recover(); err != nil {
+					slog.Error("Panic recovered in HTTP handler", "error", err, "path", r.URL.Path)
+					http.Error(w, "En uventet feil oppstod på serveren", http.StatusInternalServerError)
+				}
+			}()
+			next.ServeHTTP(w, r)
+		}
+	}
+
+	mux.HandleFunc("/i/", recoverMiddleware(http.HandlerFunc(s.handlePersonalInvite)))
+	mux.HandleFunc("/i/action", recoverMiddleware(http.HandlerFunc(s.handleInviteAction)))
+	mux.HandleFunc("/i/calendar/", recoverMiddleware(http.HandlerFunc(s.handleInviteCalendar)))
+
+	mux.HandleFunc("/login", recoverMiddleware(http.HandlerFunc(s.handleLogin)))
+	mux.HandleFunc("/logout", recoverMiddleware(http.HandlerFunc(s.handleLogout)))
+
 	// Protected Admin Routes
 	admin := func(h http.HandlerFunc) http.HandlerFunc {
-		return s.requireAdmin(s.csrfMiddleware(h))
+		return recoverMiddleware(s.requireAdmin(s.csrfMiddleware(h)))
 	}
 
 	mux.HandleFunc("/admin", admin(s.handleAdminDashboard))
@@ -244,7 +257,10 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	total, _ := s.repo.Count()
+	total, err := s.repo.Count()
+	if err != nil {
+		slog.Error("Failed to count invitations", "error", err)
+	}
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
 
 	s.render(w, r, "dashboard.html", PageData{
@@ -262,9 +278,13 @@ func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleEditInvitation(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Query().Get("id")
-	inviteID, _ := uuid.Parse(idStr)
-	inv, _ := s.repo.GetByID(inviteID)
-	if inv == nil {
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	inv, err := s.repo.GetByID(inviteID)
+	if err != nil || inv == nil {
 		http.NotFound(w, r)
 		return
 	}
@@ -285,9 +305,13 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 	}
 
 	idStr := r.FormValue("id")
-	inviteID, _ := uuid.Parse(idStr)
-	inv, _ := s.repo.GetByID(inviteID)
-	if inv == nil || inv.Status != models.StatusDraft {
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Ugyldig ID", http.StatusBadRequest)
+		return
+	}
+	inv, err := s.repo.GetByID(inviteID)
+	if err != nil || inv == nil || inv.Status != models.StatusDraft {
 		http.Error(w, "Ugyldig invitasjon", http.StatusBadRequest)
 		return
 	}
@@ -297,20 +321,29 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.Description = r.FormValue("description")
 	
 	if stStr := r.FormValue("start_time"); stStr != "" {
-		inv.StartTime, _ = time.Parse("2006-01-02T15:04", stStr)
+		t, err := time.Parse("2006-01-02T15:04", stStr)
+		if err == nil {
+			inv.StartTime = t
+		} else {
+			slog.Warn("Invalid start time format", "value", stStr, "error", err)
+		}
 	} else {
 		inv.StartTime = time.Time{}
 	}
 	if etStr := r.FormValue("end_time"); etStr != "" {
-		inv.EndTime, _ = time.Parse("2006-01-02T15:04", etStr)
+		t, err := time.Parse("2006-01-02T15:04", etStr)
+		if err == nil {
+			inv.EndTime = t
+		} else {
+			slog.Warn("Invalid end time format", "value", etStr, "error", err)
+		}
 	} else {
 		inv.EndTime = time.Time{}
 	}
 
 	fmt.Sscanf(r.FormValue("spots"), "%d", &inv.Spots)
 
-	err := s.repo.Save(inv)
-	if err != nil {
+	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to update invitation", "error", err)
 		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
 		return
@@ -332,16 +365,29 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	
 	var startTime, endTime time.Time
 	if stStr := r.FormValue("start_time"); stStr != "" {
-		startTime, _ = time.Parse("2006-01-02T15:04", stStr)
+		t, err := time.Parse("2006-01-02T15:04", stStr)
+		if err == nil {
+			startTime = t
+		} else {
+			slog.Warn("Invalid start time format", "value", stStr, "error", err)
+		}
 	}
 	if etStr := r.FormValue("end_time"); etStr != "" {
-		endTime, _ = time.Parse("2006-01-02T15:04", etStr)
+		t, err := time.Parse("2006-01-02T15:04", etStr)
+		if err == nil {
+			endTime = t
+		} else {
+			slog.Warn("Invalid end time format", "value", etStr, "error", err)
+		}
 	}
 
 	var spots int
 	fmt.Sscanf(r.FormValue("spots"), "%d", &spots)
 
-	defaultTemplate, _ := s.repo.GetSetting("default_email_template")
+	defaultTemplate, err := s.repo.GetSetting("default_email_template")
+	if err != nil {
+		slog.Error("Failed to get default email template", "error", err)
+	}
 
 	inv := models.NewInvitation(title, spots)
 	inv.Location = location
@@ -350,8 +396,7 @@ func (s *Server) handleCreateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.EndTime = endTime
 	inv.CustomEmailTemplate = defaultTemplate
 
-	err := s.repo.Save(inv)
-	if err != nil {
+	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to save new invitation", "error", err)
 		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
 		return
@@ -535,9 +580,20 @@ func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleNewStrategy(w http.ResponseWriter, r *http.Request, idStr string) {
-	inviteID, _ := uuid.Parse(idStr)
-	inv, _ := s.repo.GetByID(inviteID)
-	pastEmails, _ := s.repo.GetUniqueEmails()
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	inv, err := s.repo.GetByID(inviteID)
+	if err != nil || inv == nil {
+		http.NotFound(w, r)
+		return
+	}
+	pastEmails, err := s.repo.GetUniqueEmails()
+	if err != nil {
+		slog.Error("Failed to get unique emails", "error", err)
+	}
 
 	s.render(w, r, "new_strategy.html", PageData{
 		Invitation: inv,
@@ -566,7 +622,11 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	
 	stratType := models.StrategyType(r.FormValue("type"))
 	var participants []string
-	json.Unmarshal([]byte(r.FormValue("participants_json")), &participants)
+	if err := json.Unmarshal([]byte(r.FormValue("participants_json")), &participants); err != nil {
+		slog.Error("Failed to unmarshal participants list", "error", err)
+		http.Error(w, "Ugyldig deltakerliste", http.StatusBadRequest)
+		return
+	}
 	
 	var modelParticipants []models.Participant
 	for _, p := range participants {
@@ -576,7 +636,9 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	var inviteDuration time.Duration
 	var totalDuration time.Duration
 	var mins int
-	fmt.Sscanf(r.FormValue("duration_mins"), "%d", &mins)
+	if _, err := fmt.Sscanf(r.FormValue("duration_mins"), "%d", &mins); err != nil {
+		slog.Warn("Invalid duration format", "value", r.FormValue("duration_mins"), "error", err)
+	}
 	
 	if stratType == models.StrategyPriorityList {
 		inviteDuration = time.Duration(mins) * time.Minute
@@ -766,7 +828,10 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	session := r.Context().Value(sessionKey).(*auth.Session)
 
 	// Check if trying to delete self
-	admins, _ := s.auth.ListAdmins()
+	admins, err := s.auth.ListAdmins()
+	if err != nil {
+		slog.Error("Failed to list admins for deletion check", "error", err)
+	}
 	for _, a := range admins {
 		if a.ID.String() == idStr && a.Email == session.Email {
 			http.Error(w, "Du kan ikke slette din egen bruker", http.StatusForbidden)
