@@ -21,42 +21,70 @@
         <a href="/admin/invitations/new" class="button btn-primary">+ NY INVITASJON</a>
     </div>
 
+    <div class="card" style="margin-bottom: 24px; padding: 20px;">
+        <form action="/admin" method="GET" style="display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-end;">
+            <div style="flex: 1; min-width: 200px;">
+                <label>Søk i tittel</label>
+                <input type="text" name="q" value="{{.SearchQuery}}" placeholder="Søk..." style="margin-bottom: 0;">
+            </div>
+            <div style="width: 200px;">
+                <label>Status</label>
+                <select name="status" style="margin-bottom: 0;">
+                    <option value="">Alle statuser</option>
+                    <option value="draft" {{if eq .StatusFilter "draft"}}selected{{end}}>Utkast</option>
+                    <option value="active" {{if eq .StatusFilter "active"}}selected{{end}}>Aktiv</option>
+                    <option value="closed" {{if eq .StatusFilter "closed"}}selected{{end}}>Lukket</option>
+                </select>
+            </div>
+            <button type="submit" class="button" style="padding: 12px 24px;">FILTRER</button>
+            {{if or .SearchQuery .StatusFilter}}
+            <a href="/admin" class="button" style="background: #eee;">NULLSTILL</a>
+            {{end}}
+        </form>
+    </div>
+
     <div class="card">
         <h2>Dine invitasjoner</h2>
         {{if .Invitations}}
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Tittel</th>
-                    <th>Plasser</th>
-                    <th>Status</th>
-                    <th>Opprettet</th>
-                    <th>Handling</th>
-                </tr>
-            </thead>
-            <tbody>
-                {{range .Invitations}}
+        <div class="table-container">
+            <table class="table">
+                <thead>
                     <tr>
-                        <td><strong>{{.Title}}</strong></td>
-                        <td>{{.Spots}}</td>
-                        <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
-                        <td>{{.CreatedAt.Format "02.01.2006"}}</td>
-                        <td>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a>
-                                {{if eq .Status "closed"}}
-                                <form action="/admin/invitations/delete" method="POST" style="margin: 0;">
-                                    <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                                    <input type="hidden" name="id" value="{{.ID}}">
-                                    <button type="submit" class="button btn-danger" style="padding: 4px 12px; font-size: 0.7em;" onclick="return confirm('Er du helt sikker på at du vil slette all data for dette arrangementet?')">SLETT</button>
-                                </form>
-                                {{end}}
-                            </div>
-                        </td>
+                        <th>Tittel</th>
+                        <th>Plasser</th>
+                        <th>Påmeldt</th>
+                        <th>Venter</th>
+                        <th>Status</th>
+                        <th>Opprettet</th>
+                        <th>Handling</th>
                     </tr>
-                {{end}}
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    {{range .Invitations}}
+                        <tr>
+                            <td><strong>{{.Title}}</strong></td>
+                            <td>{{.Spots}}</td>
+                            <td><strong>{{.AcceptedCount}}</strong></td>
+                            <td>{{.PendingCount}}</td>
+                            <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
+                            <td>{{.CreatedAt.Format "02.01.2006"}}</td>
+                            <td>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <a href="/admin/invitations/{{.ID}}" class="button" style="padding: 4px 12px; font-size: 0.7em;">SE DETALJER</a>
+                                    {{if eq .Status "closed"}}
+                                    <form action="/admin/invitations/delete" method="POST" style="margin: 0;">
+                                        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                                        <input type="hidden" name="id" value="{{.ID}}">
+                                        <button type="submit" class="button btn-danger" style="padding: 4px 12px; font-size: 0.7em;" onclick="return confirm('Er du helt sikker på at du vil slette all data for dette arrangementet?')">SLETT</button>
+                                    </form>
+                                    {{end}}
+                                </div>
+                            </td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
         {{else}}
         <p>Ingen invitasjoner opprettet ennå.</p>
         {{end}}
@@ -64,13 +92,13 @@
         {{if gt .TotalPages 1}}
         <div style="margin-top: 30px; display: flex; justify-content: center; align-items: center; gap: 20px;">
             {{if .HasPrev}}
-            <a href="/admin?page={{sub .Page 1}}" class="button">← FORRIGE</a>
+            <a href="/admin?page={{sub .Page 1}}&q={{.SearchQuery}}&status={{.StatusFilter}}" class="button">← FORRIGE</a>
             {{end}}
             
             <span style="font-weight: bold; border: 3px solid black; padding: 12px 24px; background: white;">SIDE {{.Page}} AV {{.TotalPages}}</span>
             
             {{if .HasNext}}
-            <a href="/admin?page={{add .Page 1}}" class="button">NESTE →</a>
+            <a href="/admin?page={{add .Page 1}}&q={{.SearchQuery}}&status={{.StatusFilter}}" class="button">NESTE →</a>
             {{end}}
         </div>
         {{end}}

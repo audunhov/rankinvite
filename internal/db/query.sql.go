@@ -32,6 +32,24 @@ func (q *Queries) CountInvitations(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countInvitationsFiltered = `-- name: CountInvitationsFiltered :one
+SELECT COUNT(*) FROM invitations
+WHERE (?1 = '' OR json_extract(data, '$.title') LIKE '%' || ?1 || '%')
+  AND (?2 = '' OR json_extract(data, '$.status') = ?2)
+`
+
+type CountInvitationsFilteredParams struct {
+	Query  interface{} `json:"query"`
+	Status interface{} `json:"status"`
+}
+
+func (q *Queries) CountInvitationsFiltered(ctx context.Context, arg CountInvitationsFilteredParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countInvitationsFiltered, arg.Query, arg.Status)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createAdmin = `-- name: CreateAdmin :exec
 INSERT INTO admins (id, email, password_hash)
 VALUES (?, ?, ?)
@@ -231,6 +249,49 @@ type ListInvitationsParams struct {
 
 func (q *Queries) ListInvitations(ctx context.Context, arg ListInvitationsParams) ([]Invitation, error) {
 	rows, err := q.db.QueryContext(ctx, listInvitations, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Invitation
+	for rows.Next() {
+		var i Invitation
+		if err := rows.Scan(&i.ID, &i.Data); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listInvitationsFiltered = `-- name: ListInvitationsFiltered :many
+SELECT id, data FROM invitations
+WHERE (?3 = '' OR json_extract(data, '$.title') LIKE '%' || ?3 || '%')
+  AND (?4 = '' OR json_extract(data, '$.status') = ?4)
+ORDER BY rowid DESC
+LIMIT ? OFFSET ?
+`
+
+type ListInvitationsFilteredParams struct {
+	Query  interface{} `json:"query"`
+	Status interface{} `json:"status"`
+	Limit  int64       `json:"limit"`
+	Offset int64       `json:"offset"`
+}
+
+func (q *Queries) ListInvitationsFiltered(ctx context.Context, arg ListInvitationsFilteredParams) ([]Invitation, error) {
+	rows, err := q.db.QueryContext(ctx, listInvitationsFiltered,
+		arg.Query,
+		arg.Status,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

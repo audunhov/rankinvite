@@ -75,3 +75,23 @@ func NewInvitation(title string, spots int) *Invitation {
 		PersonalInvites: []PersonalInvite{},
 	}
 }
+
+func (i *Invitation) AcceptedCount() int {
+	count := 0
+	for _, pi := range i.PersonalInvites {
+		if pi.Status == StatusAccepted {
+			count++
+		}
+	}
+	return count
+}
+
+func (i *Invitation) PendingCount() int {
+	count := 0
+	for _, pi := range i.PersonalInvites {
+		if pi.Status == StatusPending {
+			count++
+		}
+	}
+	return count
+}

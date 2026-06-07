@@ -44,7 +44,7 @@
     </div>
 
     <div class="card">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
+        <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px;">
             <div>
                 <label>Sted</label>
                 <p>{{if .Invitation.Location}}{{.Invitation.Location}}{{else}}Ikke oppgitt{{end}}</p>
@@ -59,25 +59,6 @@
         </div>
         <label>Beskrivelse</label>
         <p class="pre-wrap">{{if .Invitation.Description}}{{.Invitation.Description}}{{else}}Ingen beskrivelse{{end}}</p>
-    </div>
-
-    <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-            <label style="margin: 0;">E-postmal</label>
-            <a href="/admin/invitations/preview?id={{.Invitation.ID}}" target="_blank" class="button" style="padding: 8px 16px; font-size: 0.8em;">FORHÅNDSVIS</a>
-        </div>
-        
-        {{if eq .Invitation.Status "draft"}}
-        <form action="/admin/invitations/update_template" method="POST">
-            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-            <input type="hidden" name="id" value="{{.Invitation.ID}}">
-            <textarea name="email_template" rows="8">{{.Invitation.CustomEmailTemplate}}</textarea>
-            {{template "variables_list" .}}
-            <button type="submit" class="button btn-primary" style="margin-top: 20px;">OPPDATER MAL</button>
-        </form>
-        {{else}}
-        <div style="border: 3px solid black; padding: 20px; background: #fafafa; font-size: 0.9em; white-space: pre-wrap; font-family: monospace;">{{if .Invitation.CustomEmailTemplate}}{{.Invitation.CustomEmailTemplate}}{{else}}Standardmal benyttet.{{end}}</div>
-        {{end}}
     </div>
 
     <div class="card">
@@ -110,6 +91,25 @@
             {{end}}
         {{else}}
             <p>Ingen strategier er lagt til ennå.</p>
+        {{end}}
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <label style="margin: 0;">E-postmal</label>
+            <a href="/admin/invitations/preview?id={{.Invitation.ID}}" target="_blank" class="button" style="padding: 8px 16px; font-size: 0.8em;">FORHÅNDSVIS</a>
+        </div>
+        
+        {{if eq .Invitation.Status "draft"}}
+        <form action="/admin/invitations/update_template" method="POST">
+            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+            <input type="hidden" name="id" value="{{.Invitation.ID}}">
+            <textarea name="email_template" rows="8">{{.Invitation.CustomEmailTemplate}}</textarea>
+            {{template "variables_list" .}}
+            <button type="submit" class="button btn-primary" style="margin-top: 20px;">OPPDATER MAL</button>
+        </form>
+        {{else}}
+        <div style="border: 3px solid black; padding: 20px; background: #fafafa; font-size: 0.9em; white-space: pre-wrap; font-family: monospace;">{{if .Invitation.CustomEmailTemplate}}{{.Invitation.CustomEmailTemplate}}{{else}}Standardmal benyttet.{{end}}</div>
         {{end}}
     </div>
 

@@ -41,6 +41,23 @@
         .variable-tag:active { transform: translate(2px, 2px); box-shadow: 0px 0px 0px 0px black; }
         .variables-info { margin-top: 15px; border-top: 2px solid black; padding-top: 15px; }
         .pre-wrap { white-space: pre-wrap; }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            .container { padding: 0 10px; margin: 20px auto; }
+            header { flex-direction: column; gap: 20px; text-align: center; }
+            header div { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+            header a { margin-left: 0 !important; }
+            
+            .card { padding: 16px; box-shadow: 4px 4px 0px 0px black; }
+            
+            h1 { font-size: 1.8em; }
+            
+            .table-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .table th, .table td { padding: 10px; font-size: 0.8em; }
+            
+            .grid-2 { grid-template-columns: 1fr !important; gap: 20px !important; }
+        }
     </style>
 {{end}}
 

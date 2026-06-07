@@ -66,8 +66,37 @@ func (r *InvitationRepository) List(limit, offset int32) ([]*models.Invitation, 
 	return results, nil
 }
 
+func (r *InvitationRepository) ListFiltered(query, status string, limit, offset int32) ([]*models.Invitation, error) {
+	rows, err := r.queries.ListInvitationsFiltered(context.Background(), db.ListInvitationsFilteredParams{
+		Query:  query,
+		Status: status,
+		Limit:  int64(limit),
+		Offset: int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var results []*models.Invitation
+	for _, row := range rows {
+		var inv models.Invitation
+		if err := json.Unmarshal([]byte(row.Data), &inv); err != nil {
+			return nil, err
+		}
+		results = append(results, &inv)
+	}
+	return results, nil
+}
+
 func (r *InvitationRepository) Count() (int64, error) {
 	return r.queries.CountInvitations(context.Background())
+}
+
+func (r *InvitationRepository) CountFiltered(query, status string) (int64, error) {
+	return r.queries.CountInvitationsFiltered(context.Background(), db.CountInvitationsFilteredParams{
+		Query:  query,
+		Status: status,
+	})
 }
 
 func (r *InvitationRepository) Delete(id uuid.UUID) error {

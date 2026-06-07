@@ -7,8 +7,20 @@ SELECT * FROM invitations
 ORDER BY rowid DESC
 LIMIT ? OFFSET ?;
 
+-- name: ListInvitationsFiltered :many
+SELECT * FROM invitations
+WHERE (sqlc.arg(query) = '' OR json_extract(data, '$.title') LIKE '%' || sqlc.arg(query) || '%')
+  AND (sqlc.arg(status) = '' OR json_extract(data, '$.status') = sqlc.arg(status))
+ORDER BY rowid DESC
+LIMIT ? OFFSET ?;
+
 -- name: CountInvitations :one
 SELECT COUNT(*) FROM invitations;
+
+-- name: CountInvitationsFiltered :one
+SELECT COUNT(*) FROM invitations
+WHERE (sqlc.arg(query) = '' OR json_extract(data, '$.title') LIKE '%' || sqlc.arg(query) || '%')
+  AND (sqlc.arg(status) = '' OR json_extract(data, '$.status') = sqlc.arg(status));
 
 -- name: SaveInvitation :exec
 INSERT INTO invitations (id, data) VALUES (?, ?)

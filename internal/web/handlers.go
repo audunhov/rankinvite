@@ -131,6 +131,8 @@ type PageData struct {
 	Error                string
 	FlashMessage         string
 	FlashType            string // "success" or "error"
+	SearchQuery          string
+	StatusFilter         string
 	CSRFToken            string
 	Page                 int
 	TotalPages           int
@@ -248,28 +250,33 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 		page = 1
 	}
 
+	searchQuery := r.URL.Query().Get("q")
+	statusFilter := r.URL.Query().Get("status")
+
 	pageSize := int32(10)
 	offset := int32(page-1) * pageSize
 
-	invs, err := s.repo.List(pageSize, offset)
+	invs, err := s.repo.ListFiltered(searchQuery, statusFilter, pageSize, offset)
 	if err != nil {
 		slog.Error("Failed to list invitations", "error", err)
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
 	}
 
-	total, err := s.repo.Count()
+	total, err := s.repo.CountFiltered(searchQuery, statusFilter)
 	if err != nil {
 		slog.Error("Failed to count invitations", "error", err)
 	}
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
 
 	s.render(w, r, "dashboard.html", PageData{
-		Invitations: invs,
-		Page:        page,
-		TotalPages:  totalPages,
-		HasNext:     page < totalPages,
-		HasPrev:     page > 1,
+		Invitations:  invs,
+		Page:         page,
+		TotalPages:   totalPages,
+		HasNext:      page < totalPages,
+		HasPrev:      page > 1,
+		SearchQuery:  searchQuery,
+		StatusFilter: statusFilter,
 	})
 }
 
