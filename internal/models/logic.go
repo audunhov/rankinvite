@@ -14,14 +14,21 @@ import (
 const emailWrapper = `<!DOCTYPE html>
 <html>
 <body style="margin: 0; padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f0f0f0;">
-    <div style="background-color: white; border: 4px solid black; padding: 40px; box-shadow: 12px 12px 0px 0px rgba(0,0,0,1); max-width: 600px; margin: 0 auto;">
-        <h1 style="font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid black; padding-bottom: 20px;">{{.Header}}</h1>
-        <div style="font-size: 18px; line-height: 1.6; margin: 24px 0;">{{.Content}}</div>
-        {{if .URL}}
-        <div style="margin: 40px 0;">
-            <a href="{{.URL}}" style="display: inline-block; background-color: #00ff00; color: black; text-decoration: none; padding: 20px 40px; font-weight: bold; border: 4px solid black; box-shadow: 8px 8px 0px 0px rgba(0,0,0,1); text-transform: uppercase; font-size: 20px;">{{.ButtonText}}</a>
+    <!-- Outer container for shadow effect (solid black) -->
+    <div style="background-color: #000000; max-width: 600px; margin: 0 auto; padding: 0 12px 12px 0;">
+        <!-- Inner main card (white) -->
+        <div style="background-color: #ffffff; border: 4px solid #000000; padding: 40px; margin-top: 12px; margin-left: 12px;">
+            <h1 style="font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid #000000; padding-bottom: 20px;">{{.Header}}</h1>
+            <div style="font-size: 18px; line-height: 1.6; margin: 24px 0;">{{.Content}}</div>
+            {{if .URL}}
+            <div style="margin: 40px 0;">
+                <!-- Button with shadow -->
+                <div style="display: inline-block; background-color: #000000; padding: 0 8px 8px 0;">
+                    <a href="{{.URL}}" style="display: inline-block; background-color: #00ff00; color: #000000; text-decoration: none; padding: 20px 40px; font-weight: bold; border: 4px solid #000000; text-transform: uppercase; font-size: 20px; margin-top: 8px; margin-left: 8px;">{{.ButtonText}}</a>
+                </div>
+            </div>
+            {{end}}
         </div>
-        {{end}}
     </div>
 </body>
 </html>`
