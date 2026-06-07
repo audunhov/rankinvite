@@ -176,6 +176,7 @@
                 <th>E-post</th>
                 <th>Status</th>
                 <th>Utløper</th>
+                <th>Handling</th>
             </tr>
         </thead>
         <tbody>
@@ -184,6 +185,14 @@
                 <td>{{.ParticipantEmail}}</td>
                 <td><span class="status-badge status-{{.Status}}">{{.Status}}</span></td>
                 <td>{{if .ExpiresAt.IsZero}}-{{else}}{{.ExpiresAt.Format "15:04:05"}}{{end}}</td>
+                <td>
+                    {{if or (eq .Status "pending") (eq .Status "timed_out") (eq .Status "declined")}}
+                    <button hx-post="/admin/invitations/resend?invite_id={{.ID}}"
+                            hx-target="closest div"
+                            hx-vals='{"csrf_token": "{{$.CSRFToken}}"}'
+                            class="button" style="padding: 4px 12px; font-size: 0.7em;">SEND PÅ NYTT</button>
+                    {{end}}
+                </td>
             </tr>
             {{end}}
         </tbody>

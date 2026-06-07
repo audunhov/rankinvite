@@ -178,6 +178,7 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 	mux.Handle("/admin/invitations/strategies", admin(s.handleCreateStrategy))
 	mux.Handle("/admin/invitations/strategies/delete", admin(s.handleDeleteStrategy))
 	mux.Handle("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
+	mux.Handle("/admin/invitations/resend", admin(s.handleResendEmail))
 	mux.Handle("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
 	mux.Handle("/admin/invitations/preview", admin(s.handlePreviewEmail))
 
@@ -1029,6 +1030,58 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 	}
 
 	http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+}
+
+func (s *Server) handleResendEmail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	inviteID, err := uuid.Parse(r.FormValue("invite_id"))
+	if err != nil {
+		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		return
+	}
+
+	allInvs, _ := s.repo.List(1000, 0)
+	var targetInv *models.Invitation
+	for _, inv := range allInvs {
+		for _, pi := range inv.PersonalInvites {
+			if pi.ID == inviteID {
+				targetInv = inv
+				break
+			}
+		}
+	}
+
+	if targetInv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	events := targetInv.Handle(models.Command{
+		Type:     models.CmdResend,
+		InviteID: inviteID,
+		Now:      time.Now(),
+		BaseURL:  s.baseURL,
+	})
+
+	if s.worker != nil {
+		s.worker.ProcessEvents(events, targetInv)
+	}
+
+	s.setFlash(w, "E-post sendt på nytt!", "success")
+	
+	if r.Header.Get("HX-Request") == "true" {
+		// Just send flash message via trigger or re-render?
+		// For now, let's just let the status table refresh naturally if it has a timer, 
+		// but since we want immediate feedback, let's redirect to status partial
+		http.Redirect(w, r, "/admin/invitations/status?id="+targetInv.ID.String(), http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/invitations/"+targetInv.ID.String(), http.StatusSeeOther)
 }
 
 func (s *Server) handleInvitationStatusPartial(w http.ResponseWriter, r *http.Request) {

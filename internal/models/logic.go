@@ -186,6 +186,7 @@ const (
 	CmdStart     CommandType = "start"
 	CmdCancel    CommandType = "cancel"
 	CmdForceNext CommandType = "force_next"
+	CmdResend    CommandType = "resend"
 )
 
 type Command struct {
@@ -313,6 +314,19 @@ func (i *Invitation) Handle(cmd Command) []Event {
 			}
 		}
 		events = append(events, InvitationClosedEvent{Reason: "Cancelled by administrator"})
+
+	case CmdResend:
+		for _, pi := range i.PersonalInvites {
+			if pi.ID == cmd.InviteID {
+				events = append(events, EmailSentEvent{
+					Recipient: pi.ParticipantEmail,
+					Subject:   "Invitasjon til " + i.Title,
+					URL:       fmt.Sprintf("%s/i/%s", cmd.BaseURL, pi.ID),
+					Body:      i.RenderEmailBody(pi.ID, cmd.BaseURL),
+				})
+				break
+			}
+		}
 	}
 
 	return events
