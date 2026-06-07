@@ -43,7 +43,7 @@ const emailWrapper = `<!DOCTYPE html>
 </head>
 <body>
     <div class="card">
-        <h1>RankInvite</h1>
+        <h1>Invitasjon til {{.Title}}</h1>
         <div class="content">{{.Content}}</div>
         <div style="margin: 40px 0;">
             <a href="{{.URL}}" class="button">SVAR PÅ INVITASJON</a>
@@ -93,9 +93,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	wrapperTmpl.Execute(&buf, struct {
 		Content string
 		URL     string
+		Title   string
 	}{
 		Content: content,
 		URL:     url,
+		Title:   i.Title,
 	})
 
 	return buf.String()
