@@ -67,7 +67,7 @@ func main() {
 	mux := http.NewServeMux()
 	server := web.NewServer(repo, authService)
 	server.SetBaseURL(baseURL)
-	server.RegisterHandlers(mux)
+	handler := server.RegisterHandlers(mux)
 
 	// Initialize and Start Worker
 	workerInstance := worker.NewWorker(repo, authService)
@@ -78,7 +78,7 @@ func main() {
 	server.SetWorker(workerInstance)
 
 	fmt.Printf("RankInvite (Go) - Listening on http://localhost:%s\n", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, handler); err != nil {
 		log.Fatal(err)
 	}
 }

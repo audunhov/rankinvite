@@ -70,69 +70,122 @@ func (s *Server) SetBaseURL(u string) {
 	s.baseURL = u
 }
 
-func (s *Server) RegisterHandlers(mux *http.ServeMux) {
-	// Recover Middleware
-	recoverMiddleware := func(next http.Handler) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
-			defer func() {
-				if err := recover(); err != nil {
-					slog.Error("Panic recovered in HTTP handler", "error", err, "path", r.URL.Path)
-					http.Error(w, "En uventet feil oppstod på serveren", http.StatusInternalServerError)
-				}
-			}()
-			next.ServeHTTP(w, r)
+// Middlewares
+
+func (s *Server) RecoverMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				slog.Error("Panic recovered in HTTP handler", "error", err, "path", r.URL.Path)
+				http.Error(w, "En uventet feil oppstod på serveren", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) SetupMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		admins, err := s.auth.ListAdmins()
+		if err != nil {
+			slog.Error("Failed to check admins for setup", "error", err)
 		}
-	}
+		if len(admins) == 0 && r.URL.Path != "/setup" && r.URL.Path != "/setup/post" {
+			http.Redirect(w, r, "/setup", http.StatusSeeOther)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
-	mux.HandleFunc("/i/", recoverMiddleware(http.HandlerFunc(s.handlePersonalInvite)))
-	mux.HandleFunc("/i/action", recoverMiddleware(http.HandlerFunc(s.handleInviteAction)))
-	mux.HandleFunc("/i/calendar/", recoverMiddleware(http.HandlerFunc(s.handleInviteCalendar)))
+func (s *Server) AuthMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie("session_id")
+		if err != nil {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 
-	mux.HandleFunc("/login", recoverMiddleware(http.HandlerFunc(s.handleLogin)))
-	mux.HandleFunc("/logout", recoverMiddleware(http.HandlerFunc(s.handleLogout)))
+		session, err := s.auth.GetSession(cookie.Value)
+		if err != nil {
+			slog.Warn("Invalid or expired session", "session_id", cookie.Value, "error", err)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 
-	mux.HandleFunc("/setup", recoverMiddleware(http.HandlerFunc(s.handleSetup)))
-	mux.HandleFunc("/setup/post", recoverMiddleware(http.HandlerFunc(s.handlePostSetup)))
+		ctx := context.WithValue(r.Context(), sessionKey, session)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+func (s *Server) CSRFMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			session, ok := r.Context().Value(sessionKey).(*auth.Session)
+			if ok {
+				token := r.FormValue("csrf_token")
+				if token == "" || token != session.CSRFToken {
+					slog.Warn("CSRF validation failed", "email", session.Email)
+					http.Error(w, "Ugyldig CSRF-token", http.StatusForbidden)
+					return
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
+	// Public routes
+	mux.HandleFunc("/i/", s.handlePersonalInvite)
+	mux.HandleFunc("/i/action", s.handleInviteAction)
+	mux.HandleFunc("/i/calendar/", s.handleInviteCalendar)
+
+	mux.HandleFunc("/login", s.handleLogin)
+	mux.HandleFunc("/logout", s.handleLogout)
+
+	mux.HandleFunc("/setup", s.handleSetup)
+	mux.HandleFunc("/setup/post", s.handlePostSetup)
 
 	// Root redirect
-	mux.HandleFunc("/", recoverMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
 			http.NotFound(w, r)
 			return
 		}
 		http.Redirect(w, r, "/admin", http.StatusSeeOther)
-	})))
+	})
 
-	// Protected Admin Routes
-	admin := func(h http.HandlerFunc) http.HandlerFunc {
-		return recoverMiddleware(s.setupMiddleware(s.requireAdmin(s.csrfMiddleware(h))))
-	}
+	// Admin routes
+	mux.Handle("/admin", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleAdminDashboard))))
+	mux.Handle("/admin/invitations/new", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleNewInvitation))))
+	mux.Handle("/admin/invitations/edit", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleEditInvitation))))
+	mux.Handle("/admin/invitations/update", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateInvitation))))
+	mux.Handle("/admin/invitations", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateInvitation))))
+	mux.Handle("/admin/invitations/", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleInvitationDetails))))
+	mux.Handle("/admin/invitations/action", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleAdminInvitationAction))))
+	mux.Handle("/admin/invitations/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteInvitation))))
+	mux.Handle("/admin/invitations/strategies", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateStrategy))))
+	mux.Handle("/admin/invitations/strategies/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteStrategy))))
+	mux.Handle("/admin/invitations/status", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleInvitationStatusPartial))))
+	mux.Handle("/admin/invitations/update_template", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateEmailTemplate))))
+	mux.Handle("/admin/invitations/preview", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handlePreviewEmail))))
 
-	mux.HandleFunc("/admin", admin(s.handleAdminDashboard))
-	mux.HandleFunc("/admin/invitations/new", admin(s.handleNewInvitation))
-	mux.HandleFunc("/admin/invitations/edit", admin(s.handleEditInvitation))
-	mux.HandleFunc("/admin/invitations/update", admin(s.handleUpdateInvitation))
-	mux.HandleFunc("/admin/invitations", admin(s.handleCreateInvitation))
-	mux.HandleFunc("/admin/invitations/", admin(s.handleInvitationDetails))
-	mux.HandleFunc("/admin/invitations/action", admin(s.handleAdminInvitationAction))
-	mux.HandleFunc("/admin/invitations/delete", admin(s.handleDeleteInvitation))
-	mux.HandleFunc("/admin/invitations/strategies", admin(s.handleCreateStrategy))
-	mux.HandleFunc("/admin/invitations/strategies/delete", admin(s.handleDeleteStrategy))
-	mux.HandleFunc("/admin/invitations/status", admin(s.handleInvitationStatusPartial))
-	mux.HandleFunc("/admin/invitations/update_template", admin(s.handleUpdateEmailTemplate))
-	mux.HandleFunc("/admin/invitations/preview", admin(s.handlePreviewEmail))
+	mux.Handle("/admin/users", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleListUsers))))
+	mux.Handle("/admin/users/create", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleCreateUser))))
+	mux.Handle("/admin/users/delete", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleDeleteUser))))
+	mux.Handle("/admin/users/change-password", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleChangePassword))))
 
-	mux.HandleFunc("/admin/users", admin(s.handleListUsers))
-	mux.HandleFunc("/admin/users/create", admin(s.handleCreateUser))
-	mux.HandleFunc("/admin/users/delete", admin(s.handleDeleteUser))
-	mux.HandleFunc("/admin/users/change-password", admin(s.handleChangePassword))
+	mux.Handle("/admin/invitations/subscribe", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleSubscribe))))
+	mux.Handle("/admin/invitations/unsubscribe", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUnsubscribe))))
 
-	mux.HandleFunc("/admin/invitations/subscribe", admin(s.handleSubscribe))
-	mux.HandleFunc("/admin/invitations/unsubscribe", admin(s.handleUnsubscribe))
+	mux.Handle("/admin/settings", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleSettings))))
+	mux.Handle("/admin/settings/update", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handleUpdateSettings))))
+	mux.Handle("/admin/settings/preview", s.AuthMiddleware(s.CSRFMiddleware(http.HandlerFunc(s.handlePreviewDefaultTemplate))))
 
-	mux.HandleFunc("/admin/settings", admin(s.handleSettings))
-	mux.HandleFunc("/admin/settings/update", admin(s.handleUpdateSettings))
-	mux.HandleFunc("/admin/settings/preview", admin(s.handlePreviewDefaultTemplate))
+	// Wrap the entire stack
+	stack := s.SetupMiddleware(s.RecoverMiddleware(mux))
+	return stack
 }
 
 type PageData struct {
@@ -178,20 +231,6 @@ func (s *Server) setFlash(w http.ResponseWriter, message, flashType string) {
 		Path:     "/",
 		HttpOnly: true,
 	})
-}
-
-func (s *Server) setupMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		admins, err := s.auth.ListAdmins()
-		if err != nil {
-			slog.Error("Failed to check admins for setup", "error", err)
-		}
-		if len(admins) == 0 && r.URL.Path != "/setup" && r.URL.Path != "/setup/post" {
-			http.Redirect(w, r, "/setup", http.StatusSeeOther)
-			return
-		}
-		next.ServeHTTP(w, r)
-	}
 }
 
 func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
@@ -586,7 +625,7 @@ func (s *Server) handlePersonalInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allInvs, err := s.repo.List(1000, 0) // Look in recent 1000 invitations
+	allInvs, err := s.repo.List(1000, 0)
 	if err != nil {
 		http.Error(w, "Serverfeil", http.StatusInternalServerError)
 		return
@@ -616,58 +655,6 @@ func (s *Server) handlePersonalInvite(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleInviteCalendar(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Path[len("/i/calendar/"):]
-	inviteID, err := uuid.Parse(idStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	allInvs, err := s.repo.List(1000, 0)
-	var foundInv *models.Invitation
-	for _, inv := range allInvs {
-		for _, pi := range inv.PersonalInvites {
-			if pi.ID == inviteID {
-				foundInv = inv
-				break
-			}
-		}
-	}
-
-	if foundInv == nil || foundInv.StartTime.IsZero() {
-		http.NotFound(w, r)
-		return
-	}
-
-	// Generate ICS
-	start := foundInv.StartTime.UTC().Format("20060102T150405Z")
-	endTime := foundInv.EndTime
-	if endTime.IsZero() {
-		endTime = foundInv.StartTime.Add(time.Hour)
-	}
-	end := endTime.UTC().Format("20060102T150405Z")
-	
-	ics := fmt.Sprintf("BEGIN:VCALENDAR\r\n"+
-		"VERSION:2.0\r\n"+
-		"PRODID:-//RankInvite//NONSGML v1.0//EN\r\n"+
-		"BEGIN:VEVENT\r\n"+
-		"UID:%s\r\n"+
-		"DTSTAMP:%s\r\n"+
-		"DTSTART:%s\r\n"+
-		"DTEND:%s\r\n"+
-		"SUMMARY:%s\r\n"+
-		"LOCATION:%s\r\n"+
-		"DESCRIPTION:%s\r\n"+
-		"END:VEVENT\r\n"+
-		"END:VCALENDAR\r\n",
-		inviteID, start, start, end, foundInv.Title, foundInv.Location, foundInv.Description)
-
-	w.Header().Set("Content-Type", "text/calendar")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ics\"", foundInv.Title))
-	w.Write([]byte(ics))
-}
-
 func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -676,6 +663,17 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 
 	inviteID, _ := uuid.Parse(r.FormValue("invite_id"))
 	action := r.FormValue("action")
+
+	var cmdType models.CommandType
+	switch action {
+	case "accept":
+		cmdType = models.CmdAccept
+	case "reject":
+		cmdType = models.CmdReject
+	default:
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
+	}
 
 	allInvs, _ := s.repo.List(1000, 0)
 	var targetInv *models.Invitation
@@ -693,13 +691,6 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cmdType := models.CmdDecline
-	if action == "accept" {
-		cmdType = models.CmdAccept
-	}
-
-	// Process logic
-	slog.Info("Processing invite action", "id", inviteID, "action", action)
 	events := targetInv.Handle(models.Command{
 		Type:     cmdType,
 		InviteID: inviteID,
@@ -722,14 +713,65 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/i/%s", inviteID), http.StatusSeeOther)
 }
 
+func (s *Server) handleInviteCalendar(w http.ResponseWriter, r *http.Request) {
+	idStr := r.URL.Path[len("/i/calendar/"):]
+	inviteID, err := uuid.Parse(idStr)
+	if err != nil {
+		http.Error(w, "Ugyldig ID", http.StatusBadRequest)
+		return
+	}
+
+	allInvs, _ := s.repo.List(1000, 0)
+	var foundInv *models.Invitation
+	for _, inv := range allInvs {
+		for _, pi := range inv.PersonalInvites {
+			if pi.ID == inviteID {
+				foundInv = inv
+				break
+			}
+		}
+	}
+
+	if foundInv == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Generate ICS
+	start := foundInv.StartTime.UTC().Format("20060102T150405Z")
+	endTime := foundInv.EndTime
+	if endTime.IsZero() {
+		endTime = foundInv.StartTime.Add(time.Hour)
+	}
+	end := endTime.UTC().Format("20060102T150405Z")
+	
+	ics := fmt.Sprintf("BEGIN:VCALENDAR\r\n"+
+		"VERSION:2.0\r\n"+
+		"PRODID:-//RankInvite//NONSGML v1.0//EN\r\n"+
+		"BEGIN:VEVENT\r\n"+
+		"UID:%s@rankinvite\r\n"+
+		"DTSTAMP:%s\r\n"+
+		"DTSTART:%s\r\n"+
+		"DTEND:%s\r\n"+
+		"SUMMARY:%s\r\n"+
+		"DESCRIPTION:%s\r\n"+
+		"LOCATION:%s\r\n"+
+		"END:VEVENT\r\n"+
+		"END:VCALENDAR\r\n",
+		inviteID, start, start, end, foundInv.Title, foundInv.Description, foundInv.Location)
+
+	w.Header().Set("Content-Type", "text/calendar")
+	w.Header().Set("Content-Disposition", "attachment; filename=invitation.ics")
+	w.Write([]byte(ics))
+}
+
 func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request) {
 	idStr := r.URL.Path[len("/admin/invitations/"):]
 	if idStr == "" || idStr == "new" {
 		return // Handled by other routes
 	}
 	
-	// Check for /strategies/new suffix
-	if len(idStr) > len("/strategies/new") && idStr[len(idStr)-len("/strategies/new"):] == "/strategies/new" {
+	if strings.HasSuffix(idStr, "/strategies/new") {
 		s.handleNewStrategy(w, r, idStr[:len(idStr)-len("/strategies/new")])
 		return
 	}
@@ -799,13 +841,13 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	idStr := r.FormValue("invitation_id")
+	idStr := r.FormValue("id")
 	inviteID, err := uuid.Parse(idStr)
 	if err != nil {
 		http.NotFound(w, r)
 		return
 	}
-	
+
 	inv, err := s.repo.GetByID(inviteID)
 	if err != nil || inv == nil {
 		http.NotFound(w, r)
@@ -849,7 +891,7 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	} else {
 		totalDuration = time.Duration(mins) * time.Minute
 	}
-	
+
 	inv.Strategies = append(inv.Strategies, models.Strategy{
 		Type:           stratType,
 		Participants:   modelParticipants,
@@ -887,8 +929,7 @@ func (s *Server) handleDeleteStrategy(w http.ResponseWriter, r *http.Request) {
 	// Remove strategy at index
 	inv.Strategies = append(inv.Strategies[:index], inv.Strategies[index+1:]...)
 
-	err := s.repo.Save(inv)
-	if err != nil {
+	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to delete strategy", "error", err)
 		http.Error(w, "Serverfeil ved lagring", http.StatusInternalServerError)
 		return
@@ -903,40 +944,36 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 	action := r.FormValue("action")
 	inviteID, err := uuid.Parse(idStr)
 	if err != nil {
-		slog.Error("Invalid ID in admin action", "id", idStr, "error", err)
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		http.Error(w, "Ugyldig ID", http.StatusBadRequest)
 		return
 	}
-	
+
 	inv, err := s.repo.GetByID(inviteID)
 	if err != nil || inv == nil {
 		slog.Error("Invitation not found for admin action", "id", inviteID)
 		http.NotFound(w, r)
 		return
 	}
-	
-	slog.Info("Performing admin action", "id", inviteID, "action", action)
-	var events []models.Event
-	if action == "start" {
-		events = inv.Handle(models.Command{
-			Type:    models.CmdStart,
-			Now:     time.Now(),
-			BaseURL: s.baseURL,
-		})
-	} else if action == "force_next" {
-		events = inv.Handle(models.Command{
-			Type:    models.CmdForceNext,
-			Now:     time.Now(),
-			BaseURL: s.baseURL,
-		})
-	} else if action == "cancel" {
-		events = inv.Handle(models.Command{
-			Type:    models.CmdCancel,
-			Now:     time.Now(),
-			BaseURL: s.baseURL,
-		})
+
+	var cmdType models.CommandType
+	switch action {
+	case "start":
+		cmdType = models.CmdStart
+	case "cancel":
+		cmdType = models.CmdCancel
+	case "force_next":
+		cmdType = models.CmdForceNext
+	default:
+		http.Error(w, "Invalid action", http.StatusBadRequest)
+		return
 	}
-	
+
+	events := inv.Handle(models.Command{
+		Type:    cmdType,
+		Now:     time.Now(),
+		BaseURL: s.baseURL,
+	})
+
 	if err := s.repo.Save(inv); err != nil {
 		slog.Error("Failed to save invitation after admin action", "id", inviteID, "error", err)
 	}
@@ -962,31 +999,32 @@ func (s *Server) handleInvitationStatusPartial(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "status_table", struct {
-		Invitation *models.Invitation
-	}{inv})
+	s.templates.ExecuteTemplate(w, "status_table", PageData{
+		Invitation: inv,
+	})
 }
 
 func (s *Server) handleDeleteInvitation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Redirect(w, r, "/admin", http.StatusSeeOther)
 		return
 	}
 
 	idStr := r.FormValue("id")
 	inviteID, err := uuid.Parse(idStr)
 	if err != nil {
-		http.Error(w, "Invalid ID", http.StatusBadRequest)
+		slog.Error("Invalid ID for deletion", "id", idStr, "error", err)
+		http.Error(w, "Ugyldig ID", http.StatusBadRequest)
 		return
 	}
 
 	if err := s.repo.Delete(inviteID); err != nil {
 		slog.Error("Failed to delete invitation", "id", inviteID, "error", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, "Serverfeil ved sletting", http.StatusInternalServerError)
 		return
 	}
 
-	slog.Info("Invitation deleted", "id", inviteID)
+	s.setFlash(w, "Invitasjonen ble slettet", "success")
 	http.Redirect(w, r, "/admin", http.StatusSeeOther)
 }
 
@@ -1111,30 +1149,6 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 type contextKey string
 
 const sessionKey contextKey = "session"
-
-func (s *Server) requireAdmin(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		cookie, err := r.Cookie("session_id")
-		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		session, err := s.auth.GetSession(cookie.Value)
-		if err != nil {
-			slog.Warn("Invalid or expired session", "session_id", cookie.Value, "error", err)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
-			return
-		}
-
-		slog.Debug("Admin access verified", "email", session.Email)
-		
-		// Store session in context
-		ctx := r.Context()
-		ctx = context.WithValue(ctx, sessionKey, session)
-		next(w, r.WithContext(ctx))
-	}
-}
 
 func (s *Server) handleUpdateEmailTemplate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1290,24 +1304,4 @@ func (s *Server) handlePreviewDefaultTemplate(w http.ResponseWriter, r *http.Req
 	html := dummyInv.RenderEmailBody(dummyID, s.baseURL)
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(html))
-}
-
-func (s *Server) csrfMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			session, ok := r.Context().Value(sessionKey).(*auth.Session)
-			if !ok {
-				next(w, r)
-				return
-			}
-
-			token := r.FormValue("csrf_token")
-			if token == "" || token != session.CSRFToken {
-				slog.Warn("CSRF validation failed", "email", session.Email)
-				http.Error(w, "Invalid CSRF token", http.StatusForbidden)
-				return
-			}
-		}
-		next(w, r)
-	}
 }
