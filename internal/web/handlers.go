@@ -809,7 +809,7 @@ func (s *Server) handleInviteCalendar(w http.ResponseWriter, r *http.Request) {
 		"END:VCALENDAR\r\n",
 		inviteID, start, start, end, foundInv.Title, foundInv.Description, foundInv.Location)
 
-	w.Header().Set("Content-Type", "text/calendar")
+	w.Header().Set("Content-Type", "text/calendar; charset=utf-8")
 	w.Header().Set("Content-Disposition", "attachment; filename=invitation.ics")
 	w.Write([]byte(ics))
 }
@@ -1296,7 +1296,7 @@ func (s *Server) handlePreviewEmail(w http.ResponseWriter, r *http.Request) {
 	// Use a dummy UUID for preview
 	dummyID := uuid.New()
 	html := inv.RenderEmailBody(dummyID, s.baseURL)
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
 
@@ -1449,6 +1449,6 @@ func (s *Server) handlePreviewDefaultTemplate(w http.ResponseWriter, r *http.Req
 
 	dummyID := uuid.New()
 	html := dummyInv.RenderEmailBody(dummyID, s.baseURL)
-	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }

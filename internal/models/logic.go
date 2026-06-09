@@ -12,24 +12,37 @@ import (
 )
 
 const emailWrapper = `<!DOCTYPE html>
-<html>
-<body style="margin: 0; padding: 40px; font-family: 'Courier New', Courier, monospace; background-color: #f0f0f0;">
-    <!-- Outer container for shadow effect (solid black) -->
-    <div style="background-color: #000000; max-width: 600px; margin: 0 auto; padding: 0 12px 12px 0;">
-        <!-- Inner main card (white) -->
-        <div style="background-color: #ffffff; border: 4px solid #000000; padding: 40px; margin-top: 12px; margin-left: 12px;">
-            <h1 style="font-size: 32px; text-transform: uppercase; margin-top: 0; border-bottom: 4px solid #000000; padding-bottom: 20px;">{{.Header}}</h1>
-            <div style="font-size: 18px; line-height: 1.6; margin: 24px 0;">{{.Content}}</div>
-            {{if .URL}}
-            <div style="margin: 40px 0;">
-                <!-- Button with shadow -->
-                <div style="display: inline-block; background-color: #000000; padding: 0 8px 8px 0;">
-                    <a href="{{.URL}}" style="display: inline-block; background-color: #00ff00; color: #000000; text-decoration: none; padding: 20px 40px; font-weight: bold; border: 4px solid #000000; text-transform: uppercase; font-size: 20px; margin-top: 8px; margin-left: 8px;">{{.ButtonText}}</a>
-                </div>
-            </div>
-            {{end}}
-        </div>
-    </div>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!--[if !mso]><!-->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!--<![endif]-->
+    <title>{{.Header}}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; background-color: #f0f0f0;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#f0f0f0" style="background-color: #f0f0f0;">
+        <tr>
+            <td align="center" style="padding: 40px 10px;">
+                <!-- Main Card with Shifted Shadow (box-shadow) -->
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 600px; background-color: #ffffff; border: 3px solid #000000; box-shadow: 8px 8px 0px 0px #000000; margin: 0 auto; border-collapse: separate;">
+                    <tr>
+                        <td style="padding: 32px; font-family: 'JetBrains Mono', 'Courier New', Courier, monospace;">
+                            <h1 style="font-size: 28px; line-height: 1.2; text-transform: uppercase; margin: 0; border-bottom: 3px solid #000000; padding-bottom: 20px; font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; font-weight: bold; color: #000000;">{{.Header}}</h1>
+                            <div style="font-size: 16px; line-height: 1.6; margin: 24px 0; font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; color: #000000;">{{.Content}}</div>
+                            {{if .URL}}
+                            <div style="margin-top: 40px;">
+                                <!-- Button with Shifted Shadow (box-shadow) -->
+                                <a href="{{.URL}}" style="display: inline-block; padding: 12px 24px; color: #000000; text-decoration: none; font-weight: bold; text-transform: uppercase; font-size: 16px; font-family: 'JetBrains Mono', 'Courier New', Courier, monospace; background-color: #00ff00; border: 2px solid #000000; box-shadow: 4px 4px 0px 0px #000000;">{{.ButtonText}}</a>
+                            </div>
+                            {{end}}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>`
 
@@ -98,8 +111,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 	}
 
 	// Clean up newlines and convert to HTML breaks for maximum compatibility
-	replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
-	content = replacer.Replace(content)
+	// But only if it doesn't look like it already has HTML tags
+	if !strings.Contains(content, "<p>") && !strings.Contains(content, "<br>") && !strings.Contains(content, "</div>") {
+		replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
+		content = replacer.Replace(content)
+	}
 
 	wrapperTmpl, err := template.New("wrapper").Parse(emailWrapper)
 	if err != nil {
@@ -123,9 +139,11 @@ func (i *Invitation) RenderEmailBody(inviteID uuid.UUID, baseURL string) string 
 }
 
 func RenderGenericEmail(header, content, url, buttonText string) string {
-	// Clean up newlines
-	replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
-	content = replacer.Replace(content)
+	// Clean up newlines if no HTML tags are present
+	if !strings.Contains(content, "<p>") && !strings.Contains(content, "<br>") && !strings.Contains(content, "</div>") {
+		replacer := strings.NewReplacer("\r\n", "<br>", "\n", "<br>", "\r", "<br>")
+		content = replacer.Replace(content)
+	}
 
 	wrapperTmpl, err := template.New("wrapper").Parse(emailWrapper)
 	if err != nil {

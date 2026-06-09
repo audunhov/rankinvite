@@ -3,10 +3,12 @@ package worker
 import (
 	"fmt"
 	"log/slog"
+	"mime"
 	"net/smtp"
 	"rankinvite/internal/auth"
 	"rankinvite/internal/models"
 	"rankinvite/internal/storage"
+	"strings"
 	"time"
 )
 
@@ -124,32 +126,44 @@ func (w *Worker) notifyAdmins(subscribers []string, subject, body, url, buttonTe
 	smtpUser, _ := w.repo.GetSetting("smtp_user")
 	smtpPass, _ := w.repo.GetSetting("smtp_pass")
 	globalSenderEmail, _ := w.repo.GetSetting("global_sender_email")
+	globalSenderName, _ := w.repo.GetSetting("global_sender_name")
 
 	htmlBody := models.RenderGenericEmail("RANKINVITE VARSEL", body, url, buttonText)
 
+	fromName := globalSenderName
+	if fromName == "" {
+		fromName = "RankInvite"
+	}
+	encodedFromName := mime.QEncoding.Encode("utf-8", fromName)
+	fromHeader := fmt.Sprintf("%s <%s>", encodedFromName, globalSenderEmail)
+
 	for _, recipient := range subscribers {
-		from := globalSenderEmail
 		to := []string{recipient}
 		
 		header := make(map[string]string)
-		header["From"] = from
+		header["From"] = fromHeader
 		header["To"] = recipient
-		header["Subject"] = subject
+		header["Subject"] = mime.QEncoding.Encode("utf-8", subject)
 		header["MIME-Version"] = "1.0"
-		header["Content-Type"] = "text/html; charset=\"utf-8\""
+		header["Content-Type"] = "text/html; charset=UTF-8"
 
-		message := ""
+		var message strings.Builder
 		for k, v := range header {
-			message += fmt.Sprintf("%s: %s\r\n", k, v)
+			message.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
 		}
-		message += "\r\n" + htmlBody
+		message.WriteString("\r\n")
+		
+		// Normalize body newlines to \r\n
+		bodyWithRN := strings.ReplaceAll(htmlBody, "\n", "\r\n")
+		bodyWithRN = strings.ReplaceAll(bodyWithRN, "\r\r\n", "\r\n") // Avoid double \r
+		message.WriteString(bodyWithRN)
 
 		var auth smtp.Auth
 		if smtpUser != "" {
 			auth = smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 		}
 
-		err := smtp.SendMail(smtpHost+":"+smtpPort, auth, from, to, []byte(message))
+		err := smtp.SendMail(smtpHost+":"+smtpPort, auth, globalSenderEmail, to, []byte(message.String()))
 		if err != nil {
 			slog.Warn("Failed to notify admin", "admin", recipient, "error", err)
 		} else {
@@ -175,28 +189,38 @@ func (w *Worker) sendEmail(e models.EmailSentEvent, inv *models.Invitation) {
 		fromEmail, _ = w.repo.GetSetting("global_sender_email")
 	}
 
-	from := fmt.Sprintf("%s <%s>", fromName, fromEmail)
+	if fromName == "" {
+		fromName = "RankInvite"
+	}
+
+	encodedFromName := mime.QEncoding.Encode("utf-8", fromName)
+	fromHeader := fmt.Sprintf("%s <%s>", encodedFromName, fromEmail)
 	to := []string{e.Recipient}
 
 	header := make(map[string]string)
-	header["From"] = from
+	header["From"] = fromHeader
 	header["To"] = e.Recipient
-	header["Subject"] = e.Subject
+	header["Subject"] = mime.QEncoding.Encode("utf-8", e.Subject)
 	header["MIME-Version"] = "1.0"
-	header["Content-Type"] = "text/html; charset=\"utf-8\""
+	header["Content-Type"] = "text/html; charset=UTF-8"
 
-	message := ""
+	var message strings.Builder
 	for k, v := range header {
-		message += fmt.Sprintf("%s: %s\r\n", k, v)
+		message.WriteString(fmt.Sprintf("%s: %s\r\n", k, v))
 	}
-	message += "\r\n" + e.Body
+	message.WriteString("\r\n")
+	
+	// Normalize body newlines to \r\n
+	bodyWithRN := strings.ReplaceAll(e.Body, "\n", "\r\n")
+	bodyWithRN = strings.ReplaceAll(bodyWithRN, "\r\r\n", "\r\n") // Avoid double \r
+	message.WriteString(bodyWithRN)
 
 	var auth smtp.Auth
 	if smtpUser != "" {
 		auth = smtp.PlainAuth("", smtpUser, smtpPass, smtpHost)
 	}
 
-	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, to, []byte(message))
+	err := smtp.SendMail(smtpHost+":"+smtpPort, auth, fromEmail, to, []byte(message.String()))
 	if err != nil {
 		slog.Error("Failed to send email", "recipient", e.Recipient, "error", err)
 	} else {
