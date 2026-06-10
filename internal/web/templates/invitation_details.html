@@ -4,7 +4,7 @@
     <title>{{.Invitation.Title}} - Kontrollsenter</title>
     {{template "head" .}}
     <style>
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 30px; }
         .stat-card { padding: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; background: white; text-align: center; }
         .stat-value { font-size: 2em; font-weight: bold; display: block; line-height: 1; margin-bottom: 5px; }
         .stat-label { font-size: 0.7em; text-transform: uppercase; font-weight: bold; color: #666; }
@@ -30,11 +30,12 @@
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         
-        .action-bar { position: sticky; top: 0; z-index: 100; background: white; padding: 15px 0; border-bottom: 3px solid black; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
-
-        /* Unified Info Box */
-        .info-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-        .editable-description { width: 100%; min-height: 100px; padding: 15px; border: 3px solid black; font-family: inherit; font-size: 0.9em; line-height: 1.5; background: #fffde7; margin-bottom: 10px; }
+        .inline-input { border: none; border-bottom: 2px dashed #ccc; font-family: inherit; font-size: inherit; font-weight: inherit; padding: 2px 5px; width: auto; background: transparent; }
+        .inline-input:focus { outline: none; border-bottom-color: black; background: #fffde7; }
+        
+        .title-input { font-size: 2em; font-weight: bold; width: 100%; border-bottom-width: 4px; margin-bottom: 10px; }
+        
+        .editable-description { width: 100%; min-height: 120px; padding: 15px; border: 3px solid black; font-family: inherit; font-size: 0.9em; line-height: 1.5; background: #fffde7; margin-bottom: 10px; resize: vertical; }
     </style>
 </head>
 <body class="container">
@@ -69,179 +70,179 @@
         <a href="/admin" class="back-link">← DASHBOARD</a>
         <div style="display: flex; gap: 10px; align-items: center;">
              <span class="status-badge status-{{.Invitation.Status}}">{{if eq .Invitation.Status "completed"}}FULLTEGNET{{else if eq .Invitation.Status "exhausted"}}FERDIG{{else}}{{.Invitation.Status}}{{end}}</span>
-             <a href="/admin/invitations/edit?id={{.Invitation.ID}}" class="button" style="padding: 6px 12px; font-size: 0.7em;">INNSTILLINGER</a>
         </div>
     </header>
 
-    <div class="row">
-        <!-- LEFT: MAIN CONTROL & INFO -->
-        <div class="col col-8">
-            <div style="margin-bottom: 30px;">
-                <h1 style="margin: 0 0 10px 0;">{{.Invitation.Title}}</h1>
-                <div style="display: flex; gap: 20px; font-size: 0.9em; color: #666;">
-                    <span><strong>STED:</strong> {{if .Invitation.Location}}{{.Invitation.Location}}{{else}}Ikke oppgitt{{end}}</span>
-                    <span><strong>TID:</strong> {{if .Invitation.StartTime.IsZero}}Ikke oppgitt{{else}}{{.Invitation.StartTime.Format "02.01.2006 15:04"}}{{end}}</span>
+    <form action="/admin/invitations/update" method="POST" hx-post="/admin/invitations/update" hx-target="#invitation-details-container" hx-trigger="change delay:500ms from:.auto-save, click from:#save-btn">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <input type="hidden" name="id" value="{{.Invitation.ID}}">
+        
+        <div class="row">
+            <!-- LEFT: MAIN CONTROL & INFO -->
+            <div class="col col-8">
+                <div style="margin-bottom: 30px;">
+                    <input type="text" name="title" value="{{.Invitation.Title}}" class="inline-input title-input auto-save" placeholder="Tittel på arrangement">
+                    
+                    <div style="display: flex; gap: 30px; font-size: 0.9em; color: #666; align-items: center;">
+                        <div>
+                            <strong>STED:</strong> 
+                            <input type="text" name="location" value="{{.Invitation.Location}}" class="inline-input auto-save" style="width: 200px;" placeholder="Legg til sted...">
+                        </div>
+                        <div>
+                            <strong>TID:</strong> 
+                            <input type="datetime-local" name="start_time" value="{{if not .Invitation.StartTime.IsZero}}{{.Invitation.StartTime.Format "2006-01-02T15:04"}}{{end}}" class="inline-input auto-save" style="font-size: 0.8em;">
+                        </div>
+                        <button type="submit" id="save-btn" class="button" style="padding: 4px 12px; font-size: 0.7em; background: #00ffff; display: none;">LAGRE</button>
+                    </div>
                 </div>
-            </div>
 
-            <!-- DASHBOARD STATS -->
-            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
-                <div class="stat-card" style="grid-column: span 3; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 40px;">
-                    <div style="flex: 1;">
-                        <span class="stat-label">Plasser fylt</span>
-                        <span class="stat-value" style="font-size: 2.5em;">{{.Invitation.AcceptedCount}} / {{add .Invitation.AcceptedCount .Invitation.Spots}}</span>
-                        <div class="progress-container" style="margin-top: 15px;">
-                            <div class="progress-bar" style="width: {{.Invitation.ProgressPercentage}}%;"></div>
+                <!-- DASHBOARD STATS -->
+                <div class="stats-grid">
+                    <div class="stat-card" style="grid-column: span 3; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 40px;">
+                        <div style="flex: 1;">
+                            <span class="stat-label">Plasser fylt</span>
+                            <div style="display: flex; align-items: baseline; gap: 10px;">
+                                <span class="stat-value" style="font-size: 2.5em;">{{.Invitation.AcceptedCount}} /</span>
+                                <input type="number" name="spots" value="{{add .Invitation.AcceptedCount .Invitation.Spots}}" min="1" class="inline-input auto-save" style="font-size: 2.5em; width: 80px; font-weight: bold; border-bottom-width: 4px;">
+                            </div>
+                            <div class="progress-container" style="margin-top: 15px;">
+                                <div class="progress-bar" style="width: {{.Invitation.ProgressPercentage}}%;"></div>
+                            </div>
+                        </div>
+                        <div style="text-align: center; border-left: 2px solid #eee; padding-left: 40px;">
+                            <span class="stat-label">Gjenstår</span>
+                            <span class="stat-value">{{.Invitation.Spots}}</span>
                         </div>
                     </div>
-                    <div style="text-align: center; border-left: 2px solid #eee; padding-left: 40px;">
-                        <span class="stat-label">Gjenstår</span>
-                        <span class="stat-value">{{.Invitation.Spots}}</span>
+                    <div class="stat-card">
+                        <span class="stat-value" style="color: #00aa00;">{{.Invitation.AcceptedCount}}</span>
+                        <span class="stat-label">Godtatt (JA)</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" style="color: #ff0000;">{{.Invitation.DeclinedCount}}</span>
+                        <span class="stat-label">Avslått (NEI)</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" style="color: #aa6600;">{{.Invitation.PendingCount}}</span>
+                        <span class="stat-label">Venter på svar</span>
                     </div>
                 </div>
-                <div class="stat-card">
-                    <span class="stat-value" style="color: #00aa00;">{{.Invitation.AcceptedCount}}</span>
-                    <span class="stat-label">Godtatt (JA)</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" style="color: #ff0000;">{{.Invitation.DeclinedCount}}</span>
-                    <span class="stat-label">Avslått (NEI)</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-value" style="color: #aa6600;">{{.Invitation.PendingCount}}</span>
-                    <span class="stat-label">Venter på svar</span>
-                </div>
-            </div>
 
-            <!-- DESCRIPTION BOX -->
-            <div class="card" style="padding: 20px; background: #fffde7; margin-bottom: 30px;">
-                <form action="/admin/invitations/update" method="POST" hx-post="/admin/invitations/update" hx-target="#invitation-details-container">
-                    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                    <input type="hidden" name="id" value="{{.Invitation.ID}}">
-                    <input type="hidden" name="title" value="{{.Invitation.Title}}">
-                    <input type="hidden" name="location" value="{{.Invitation.Location}}">
-                    <input type="hidden" name="start_time" value="{{if not .Invitation.StartTime.IsZero}}{{.Invitation.StartTime.Format "2006-01-02T15:04"}}{{end}}">
-                    <input type="hidden" name="end_time" value="{{if not .Invitation.EndTime.IsZero}}{{.Invitation.EndTime.Format "2006-01-02T15:04"}}{{end}}">
-                    <input type="hidden" name="spots" value="{{add .Invitation.AcceptedCount .Invitation.Spots}}">
-                    <input type="hidden" name="sender_name" value="{{.Invitation.SenderName}}">
-                    <input type="hidden" name="sender_email" value="{{.Invitation.SenderEmail}}">
-                    
-                    <label style="display: flex; justify-content: space-between; align-items: center;">
-                        Beskrivelse (offentlig)
-                        <button type="submit" class="button" style="padding: 4px 10px; font-size: 0.6em; background: white;">LAGRE ENDRINGER</button>
-                    </label>
-                    <textarea name="description" class="editable-description">{{.Invitation.Description}}</textarea>
-                </form>
-            </div>
+                <!-- DESCRIPTION BOX -->
+                <div style="margin-bottom: 30px;">
+                    <label style="font-size: 0.8em; color: #666; margin-bottom: 5px; display: block;">BESKRIVELSE (Vises til deltakerne)</label>
+                    <textarea name="description" class="editable-description auto-save" placeholder="Skriv en invitasjonstekst her...">{{.Invitation.Description}}</textarea>
+                </div>
 
-            <!-- PARTICIPANTS LIST -->
-            <h2 style="font-size: 1em; text-transform: uppercase; margin-bottom: 15px;">Deltakeroversikt</h2>
-            <div id="participant-list">
-                {{range .Invitation.PersonalInvites}}
-                <div class="participant-row status-{{.Status}}">
-                    <div class="status-icon">
-                        {{if eq .Status "accepted"}}✓{{else if eq .Status "declined"}}✕{{else if eq .Status "pending"}}?{{else}}!{{end}}
-                    </div>
-                    <div style="flex: 1;">
-                        <div style="font-weight: bold;">{{.ParticipantEmail}}</div>
-                        <div style="font-size: 0.7em; color: #666; text-transform: uppercase;">
-                            {{if eq .Status "pending"}}
-                                Svarfrist: <span data-expires="{{.ExpiresAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.ExpiresAt.Format "15:04"}}</span>
-                            {{else if eq .Status "accepted"}}
-                                Godtok invitasjon
-                            {{else if eq .Status "declined"}}
-                                Avslo invitasjon
-                            {{else if eq .Status "timed_out"}}
-                                Utløpt (svarte ikke)
+                <!-- PARTICIPANTS LIST -->
+                <h2 style="font-size: 1em; text-transform: uppercase; margin-bottom: 15px;">Deltakeroversikt</h2>
+                <div id="participant-list">
+                    {{range .Invitation.PersonalInvites}}
+                    <div class="participant-row status-{{.Status}}">
+                        <div class="status-icon">
+                            {{if eq .Status "accepted"}}✓{{else if eq .Status "declined"}}✕{{else if eq .Status "pending"}}?{{else}}!{{end}}
+                        </div>
+                        <div style="flex: 1;">
+                            <div style="font-weight: bold;">{{.ParticipantEmail}}</div>
+                            <div style="font-size: 0.7em; color: #666; text-transform: uppercase;">
+                                {{if eq .Status "pending"}}
+                                    Svarfrist: <span data-expires="{{.ExpiresAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.ExpiresAt.Format "15:04"}}</span>
+                                {{else if eq .Status "accepted"}}
+                                    Godtok invitasjon
+                                {{else if eq .Status "declined"}}
+                                    Avslo invitasjon
+                                {{else if eq .Status "timed_out"}}
+                                    Utløpt (svarte ikke)
+                                {{end}}
+                            </div>
+                        </div>
+                        <div>
+                            {{if and (or (eq .Status "pending") (eq .Status "timed_out") (eq .Status "declined")) (gt $.Invitation.Spots 0)}}
+                            <button type="button" hx-post="/admin/invitations/resend?invite_id={{.ID}}"
+                                    hx-target="closest .participant-row"
+                                    hx-swap="outerHTML"
+                                    hx-vals='{"csrf_token": "{{$.CSRFToken}}"}'
+                                    class="button" style="padding: 6px 12px; font-size: 0.7em;">
+                                {{if eq .Status "pending"}}PURR{{else}}REAKTIVER{{end}}
+                            </button>
                             {{end}}
                         </div>
                     </div>
-                    <div>
-                        {{if and (or (eq .Status "pending") (eq .Status "timed_out") (eq .Status "declined")) (gt $.Invitation.Spots 0)}}
-                        <button hx-post="/admin/invitations/resend?invite_id={{.ID}}"
-                                hx-target="closest .participant-row"
-                                hx-swap="outerHTML"
-                                hx-vals='{"csrf_token": "{{$.CSRFToken}}"}'
-                                class="button" style="padding: 6px 12px; font-size: 0.7em;">
-                            {{if eq .Status "pending"}}PURR{{else}}REAKTIVER{{end}}
-                        </button>
-                        {{end}}
-                    </div>
-                </div>
-                {{end}}
-                {{if eq (len .Invitation.PersonalInvites) 0}}
-                <div class="card" style="text-align: center; color: #666; padding: 20px;">
-                    Ingen deltakere har mottatt invitasjon ennå.
-                </div>
-                {{end}}
-            </div>
-        </div>
-
-        <!-- RIGHT: PROCESS & ACTIONS -->
-        <div class="col col-4">
-            <div class="card" style="padding: 20px; border-width: 4px; background: #fafafa;">
-                <h2 style="font-size: 0.9em; text-transform: uppercase; margin-top: 0;">Kontrollpanel</h2>
-                
-                <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
-                    {{if eq .Invitation.Status "draft"}}
-                        <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=start" 
-                                hx-target="#invitation-details-container"
-                                hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                                class="button btn-success" style="width: 100%;">START UTSENDELSE</button>
-                    {{else if eq .Invitation.Status "active"}}
-                        <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=force_next" 
-                                hx-target="#invitation-details-container"
-                                hx-confirm="Hoppe over nåværende ventetid?"
-                                hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                                class="button btn-primary" style="width: 100%;">NESTE I KØEN</button>
                     {{end}}
+                    {{if eq (len .Invitation.PersonalInvites) 0}}
+                    <div class="card" style="text-align: center; color: #666; padding: 20px;">
+                        Ingen deltakere har mottatt invitasjon ennå.
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- RIGHT: PROCESS & ACTIONS -->
+            <div class="col col-4">
+                <div class="card" style="padding: 20px; border-width: 4px; background: #fafafa; position: sticky; top: 20px;">
+                    <h2 style="font-size: 0.9em; text-transform: uppercase; margin-top: 0;">Kontrollpanel</h2>
                     
-                    {{if or (eq .Invitation.Status "draft") (eq .Invitation.Status "active")}}
-                    <button hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=cancel" 
-                            hx-target="#invitation-details-container"
-                            hx-confirm="Er du sikker på at du vil avbryte HELE prosessen?"
-                            hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                            class="button btn-danger" style="width: 100%;">AVBRYT ALT</button>
-                    {{end}}
-                </div>
-
-                <h2 style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 15px; border-top: 2px solid black; padding-top: 15px;">Utsendelsesforløp</h2>
-                <div class="timeline">
-                    {{range $index, $strat := .Invitation.Strategies}}
-                    {{$isCompleted := lt $index $.Invitation.CurrentStrategyIndex}}
-                    {{$isActive := and (eq $index $.Invitation.CurrentStrategyIndex) (eq $.Invitation.Status "active")}}
-                    <div class="timeline-item {{if $isActive}}active{{end}} {{if $isCompleted}}completed{{end}}">
-                        <div class="timeline-dot"></div>
-                        <div style="font-weight: bold; font-size: 0.7em;">
-                            {{if eq $strat.Type "priority_list"}}PRIORITERT LISTE{{else}}FCFS{{end}}
-                        </div>
-                        <div style="font-size: 0.6em; color: #666;">
-                            {{len $strat.Participants}} pers • 
-                            {{if eq $strat.Type "priority_list"}}{{$strat.InviteDuration}}{{else}}{{$strat.TotalDuration}}{{end}}
-                        </div>
-                    </div>
-                    {{end}}
-                    {{if eq .Invitation.Status "draft"}}
-                    <a href="/admin/invitations/{{.Invitation.ID}}/strategies/new" class="button" style="width: 100%; font-size: 0.7em; padding: 8px;">+ NYTT STEG</a>
-                    {{end}}
-                </div>
-
-                <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <label style="margin: 0; font-size: 0.8em;">Følgere</label>
-                        {{if .IsSubscribed}}
-                        <button hx-post="/admin/invitations/unsubscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button" style="padding: 4px 8px; font-size: 0.6em;">AVSLUTT</button>
-                        {{else}}
-                        <button hx-post="/admin/invitations/subscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button btn-success" style="padding: 4px 8px; font-size: 0.6em;">FØLG</button>
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
+                        {{if eq .Invitation.Status "draft"}}
+                            <button type="button" hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=start" 
+                                    hx-target="#invitation-details-container"
+                                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                                    class="button btn-success" style="width: 100%;">START UTSENDELSE</button>
+                        {{else if eq .Invitation.Status "active"}}
+                            <button type="button" hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=force_next" 
+                                    hx-target="#invitation-details-container"
+                                    hx-confirm="Hoppe over nåværende ventetid?"
+                                    hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                                    class="button btn-primary" style="width: 100%;">NESTE I KØEN</button>
+                        {{end}}
+                        
+                        {{if or (eq .Invitation.Status "draft") (eq .Invitation.Status "active")}}
+                        <button type="button" hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=cancel" 
+                                hx-target="#invitation-details-container"
+                                hx-confirm="Er du sikker på at du vil avbryte HELE prosessen?"
+                                hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
+                                class="button btn-danger" style="width: 100%;">AVBRYT ALT</button>
                         {{end}}
                     </div>
-                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
-                        {{range .Invitation.Subscribers}}
-                        <span style="background: black; color: white; padding: 2px 6px; font-size: 0.6em; border: 1px solid black;">{{.}}</span>
+
+                    <h2 style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 15px; border-top: 2px solid black; padding-top: 15px;">Utsendelsesforløp</h2>
+                    <div class="timeline">
+                        {{range $index, $strat := .Invitation.Strategies}}
+                        {{$isCompleted := lt $index $.Invitation.CurrentStrategyIndex}}
+                        {{$isActive := and (eq $index $.Invitation.CurrentStrategyIndex) (eq $.Invitation.Status "active")}}
+                        <div class="timeline-item {{if $isActive}}active{{end}} {{if $isCompleted}}completed{{end}}">
+                            <div class="timeline-dot"></div>
+                            <div style="font-weight: bold; font-size: 0.7em;">
+                                {{if eq $strat.Type "priority_list"}}PRIORITERT LISTE{{else}}FCFS{{end}}
+                            </div>
+                            <div style="font-size: 0.6em; color: #666;">
+                                {{len $strat.Participants}} pers • 
+                                {{if eq $strat.Type "priority_list"}}{{$strat.InviteDuration}}{{else}}{{$strat.TotalDuration}}{{end}}
+                            </div>
+                        </div>
                         {{end}}
+                        {{if eq .Invitation.Status "draft"}}
+                        <a href="/admin/invitations/{{.Invitation.ID}}/strategies/new" class="button" style="width: 100%; font-size: 0.7em; padding: 8px;">+ NYTT STEG</a>
+                        {{end}}
+                    </div>
+
+                    <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <label style="margin: 0; font-size: 0.8em;">Følgere</label>
+                            {{if .IsSubscribed}}
+                            <button type="button" hx-post="/admin/invitations/unsubscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button" style="padding: 4px 8px; font-size: 0.6em;">AVSLUTT</button>
+                            {{else}}
+                            <button type="button" hx-post="/admin/invitations/subscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button btn-success" style="padding: 4px 8px; font-size: 0.6em;">FØLG</button>
+                            {{end}}
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                            {{range .Invitation.Subscribers}}
+                            <span style="background: black; color: white; padding: 2px 6px; font-size: 0.6em; border: 1px solid black;">{{.}}</span>
+                            {{end}}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+    </form>
 {{end}}

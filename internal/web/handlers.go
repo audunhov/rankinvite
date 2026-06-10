@@ -175,7 +175,6 @@ func (s *Server) RegisterHandlers(mux *http.ServeMux) http.Handler {
 
 	mux.Handle("/admin/", admin(s.handleAdminDashboard))
 	mux.Handle("/admin/invitations/new", admin(s.handleNewInvitation))
-	mux.Handle("/admin/invitations/edit", admin(s.handleEditInvitation))
 	mux.Handle("/admin/invitations/update", admin(s.handleUpdateInvitation))
 	mux.Handle("/admin/invitations", admin(s.handleCreateInvitation))
 	mux.Handle("/admin/invitations/", admin(s.handleInvitationDetails))
@@ -484,28 +483,6 @@ func (s *Server) handleNewInvitation(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func (s *Server) handleEditInvitation(w http.ResponseWriter, r *http.Request) {
-	idStr := r.URL.Query().Get("id")
-	inviteID, err := uuid.Parse(idStr)
-	if err != nil {
-		http.NotFound(w, r)
-		return
-	}
-	inv, err := s.repo.GetByID(inviteID)
-	if err != nil || inv == nil {
-		http.NotFound(w, r)
-		return
-	}
-
-	if inv.Status != models.StatusDraft {
-		s.setFlash(w, "Kan bare redigere utkast", "error")
-		http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
-		return
-	}
-
-	s.render(w, r, "edit_invitation.html", PageData{Invitation: inv})
-}
-
 func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -519,7 +496,7 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	inv, err := s.repo.GetByID(inviteID)
-	if err != nil || inv == nil || inv.Status != models.StatusDraft {
+	if err != nil || inv == nil {
 		http.Error(w, "Ugyldig invitasjon", http.StatusBadRequest)
 		return
 	}
@@ -527,10 +504,10 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 	inv.Title = r.FormValue("title")
 	inv.Location = r.FormValue("location")
 	inv.Description = r.FormValue("description")
-	
+
 	if inv.Title == "" {
 		s.setFlash(w, "Tittel kan ikke være tom", "error")
-		http.Redirect(w, r, "/admin/invitations/edit?id="+idStr, http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
 		return
 	}
 
@@ -538,27 +515,21 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 		t, err := time.Parse("2006-01-02T15:04", stStr)
 		if err == nil {
 			inv.StartTime = t
-		} else {
-			slog.Warn("Invalid start time format", "value", stStr, "error", err)
 		}
-	} else {
-		inv.StartTime = time.Time{}
 	}
 	if etStr := r.FormValue("end_time"); etStr != "" {
 		t, err := time.Parse("2006-01-02T15:04", etStr)
 		if err == nil {
 			inv.EndTime = t
-		} else {
-			slog.Warn("Invalid end time format", "value", etStr, "error", err)
 		}
-	} else {
-		inv.EndTime = time.Time{}
 	}
 
-	if _, err := fmt.Sscanf(r.FormValue("spots"), "%d", &inv.Spots); err != nil || inv.Spots < 1 {
-		s.setFlash(w, "Antall plasser må være minst 1", "error")
-		http.Redirect(w, r, "/admin/invitations/edit?id="+idStr, http.StatusSeeOther)
-		return
+	if spotsVal := r.FormValue("spots"); spotsVal != "" {
+		var totalSpots int
+		if _, err := fmt.Sscanf(spotsVal, "%d", &totalSpots); err == nil && totalSpots >= 1 {
+			// Calculate available spots based on total and current accepted count
+			inv.Spots = totalSpots - inv.AcceptedCount()
+		}
 	}
 
 	if err := s.repo.Save(inv); err != nil {
@@ -567,7 +538,25 @@ func (s *Server) handleUpdateInvitation(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	s.setFlash(w, "Invitasjonen ble oppdatert!", "success")
+	s.setFlash(w, "Endringene ble lagret!", "success")
+
+	if r.Header.Get("HX-Request") == "true" {
+		session := r.Context().Value(sessionKey).(*auth.Session)
+		isSubscribed := false
+		for _, sub := range inv.Subscribers {
+			if sub == session.Email {
+				isSubscribed = true
+				break
+			}
+		}
+
+		s.render(w, r, "invitation_details_content", PageData{
+			Invitation:   inv,
+			IsSubscribed: isSubscribed,
+		})
+		return
+	}
+
 	http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s", inv.ID), http.StatusSeeOther)
 }
 
