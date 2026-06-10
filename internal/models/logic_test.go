@@ -30,8 +30,8 @@ func TestDSTRaceConditionLastSpot(t *testing.T) {
 	if inv.Spots != 0 {
 		t.Errorf("Expected 0 spots, got %d", inv.Spots)
 	}
-	if inv.Status != StatusClosed {
-		t.Errorf("Expected status closed, got %s", inv.Status)
+	if inv.Status != StatusCompleted {
+		t.Errorf("Expected status completed, got %s", inv.Status)
 	}
 
 	// P2 tries to accept (The Race)
@@ -116,8 +116,8 @@ func TestDSTComplexChain(t *testing.T) {
 
 	// P3 accepts at t+30m -> 0 spots left, status closed
 	inv.Handle(Command{Type: CmdAccept, InviteID: inv.PersonalInvites[2].ID, Now: now.Add(30 * time.Minute)})
-	if inv.Spots != 0 || inv.Status != StatusClosed {
-		t.Errorf("Expected 0 spots and closed status, got %d and %s", inv.Spots, inv.Status)
+	if inv.Spots != 0 || inv.Status != StatusCompleted {
+		t.Errorf("Expected 0 spots and completed status, got %d and %s", inv.Spots, inv.Status)
 	}
 }
 
