@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"rankinvite/internal/auth"
 	"rankinvite/internal/models"
 	"rankinvite/internal/storage"
@@ -239,7 +240,7 @@ type PageData struct {
 func (s *Server) setFlash(w http.ResponseWriter, message, flashType string) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "flash_message",
-		Value:    message,
+		Value:    url.QueryEscape(message),
 		Path:     "/",
 		HttpOnly: true,
 	})
@@ -312,7 +313,11 @@ func (s *Server) render(w http.ResponseWriter, r *http.Request, name string, dat
 
 	// Handle flash messages
 	if cookie, err := r.Cookie("flash_message"); err == nil {
-		data.FlashMessage = cookie.Value
+		if msg, err := url.QueryUnescape(cookie.Value); err == nil {
+			data.FlashMessage = msg
+		} else {
+			data.FlashMessage = cookie.Value
+		}
 		// Clear cookie
 		http.SetCookie(w, &http.Cookie{Name: "flash_message", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
 	}
@@ -429,7 +434,7 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		s.templates.ExecuteTemplate(w, "invitation_table", data)
+		s.render(w, r, "invitation_table", data)
 		return
 	}
 
@@ -752,7 +757,7 @@ func (s *Server) handleInviteAction(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		s.templates.ExecuteTemplate(w, "invite_content", PageData{
+		s.render(w, r, "invite_content", PageData{
 			Invitation: targetInv,
 			Invite:     foundPersonalInvite,
 		})
@@ -863,7 +868,7 @@ func (s *Server) handleInvitationDetails(w http.ResponseWriter, r *http.Request)
 	}
 
 	if r.Header.Get("HX-Request") == "true" {
-		s.templates.ExecuteTemplate(w, "invitation_details_content", data)
+		s.render(w, r, "invitation_details_content", data)
 		return
 	}
 
@@ -1126,7 +1131,7 @@ func (s *Server) handleInvitationStatusPartial(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	s.templates.ExecuteTemplate(w, "status_table", PageData{
+	s.render(w, r, "status_table", PageData{
 		Invitation: inv,
 	})
 }
