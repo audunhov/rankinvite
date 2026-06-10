@@ -32,8 +32,8 @@
                         <option value="240">4 timer</option>
                         <option value="480">8 timer</option>
                         <option value="720">12 timer</option>
-                        <option value="1440" selected>1 dag (24t)</option>
-                        <option value="2880">2 dager (48t)</option>
+                        <option value="1440" selected>1 dag</option>
+                        <option value="2880">2 dager</option>
                         <option value="4320">3 dager</option>
                         <option value="10080">1 uke</option>
                         <option value="custom">Egendefinert...</option>
@@ -209,7 +209,7 @@
             const participantsLabel = document.getElementById('participantsLabel');
             
             durationLabel.innerText = type === 'priority_list' ? 'Svarfrist per person' : 'Total tidsfrist for runden';
-            participantsLabel.innerText = type === 'priority_list' ? 'Deltakere (dra og slipp for å prioritere)' : 'Deltakere (rekkefølge har ingen betydning)';
+            participantsLabel.innerText = type === 'priority_list' ? 'Deltakere (dra og slipp for å prioritere)' : 'Deltakere';
             
             renderList();
         }
