@@ -147,32 +147,6 @@
 
         <!-- BRUKERE TAB -->
         <div id="users" class="tab-content">
-            <!-- DIN PROFIL SECTION -->
-            <details class="card" style="margin-bottom: 40px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; padding: 0;">
-                <summary style="padding: 20px; cursor: pointer; font-weight: bold; background: #fafafa; display: flex; justify-content: space-between; align-items: center; list-style: none;">
-                    <span>DIN PROFIL & SIKKERHET</span>
-                    <span style="font-size: 0.8em; border: 2px solid black; padding: 2px 8px; background: white;">ENDRE PASSORD</span>
-                </summary>
-                <div style="padding: 30px; border-top: 3px solid black; background: white;">
-                    <form action="/admin/users/change-password" method="POST" style="max-width: 500px;">
-                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                        <div class="form-group">
-                            <label>Nåværende passord</label>
-                            <input type="password" name="current_password" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Nytt passord</label>
-                            <input type="password" name="new_password" minlength="6" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Gjenta nytt passord</label>
-                            <input type="password" name="confirm_password" minlength="6" required>
-                        </div>
-                        <button type="submit" class="button btn-primary" style="width: 100%;">OPPDATER PASSORD</button>
-                    </form>
-                </div>
-            </details>
-
             <!-- ADMINISTRATOR LIST SECTION -->
             <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
                 <h2 style="margin: 0;">Systemadministratorer</h2>
@@ -180,26 +154,55 @@
             
             <div id="admin-list" style="margin-bottom: 40px;">
                 {{range .Admins}}
+                {{if eq .Email $.CurrentEmail}}
+                <!-- Current User Card with Password Change -->
+                <details class="card" style="margin-bottom: 15px; padding: 0; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; background: white;">
+                    <summary style="padding: 20px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; list-style: none;">
+                        <div>
+                            <div style="font-weight: bold; font-size: 1.1em; display: flex; align-items: center; gap: 10px;">
+                                {{.Name}}
+                                <span style="font-size: 0.6em; background: black; color: white; padding: 2px 8px; border: 1px solid black;">DEG</span>
+                            </div>
+                            <div style="color: #666; font-size: 0.9em;">{{.Email}}</div>
+                        </div>
+                        <div class="button" style="padding: 6px 16px; font-size: 0.8em;">BYTT PASSORD</div>
+                    </summary>
+                    <div style="padding: 30px; border-top: 3px solid black; background: #fafafa;">
+                        <h3 style="font-size: 1em; margin-bottom: 20px;">BYTT DITT PASSORD</h3>
+                        <form action="/admin/users/change-password" method="POST" style="max-width: 500px;">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <div class="form-group">
+                                <label>Nåværende passord</label>
+                                <input type="password" name="current_password" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Nytt passord</label>
+                                <input type="password" name="new_password" minlength="6" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Gjenta nytt passord</label>
+                                <input type="password" name="confirm_password" minlength="6" required>
+                            </div>
+                            <button type="submit" class="button btn-primary" style="width: 100%;">OPPDATER PASSORD</button>
+                        </form>
+                    </div>
+                </details>
+                {{else}}
+                <!-- Other Admin Cards -->
                 <div class="card" style="margin-bottom: 15px; padding: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; display: flex; justify-content: space-between; align-items: center; background: white;">
                     <div>
-                        <div style="font-weight: bold; font-size: 1.1em; display: flex; align-items: center; gap: 10px;">
-                            {{.Name}}
-                            {{if eq .Email $.CurrentEmail}}
-                            <span style="font-size: 0.6em; background: black; color: white; padding: 2px 8px; border: 1px solid black;">DEG</span>
-                            {{end}}
-                        </div>
+                        <div style="font-weight: bold; font-size: 1.1em;">{{.Name}}</div>
                         <div style="color: #666; font-size: 0.9em;">{{.Email}}</div>
                     </div>
                     <div>
-                        {{if ne .Email $.CurrentEmail}}
                         <form action="/admin/users/delete" method="POST" style="margin: 0;">
                             <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
                             <input type="hidden" name="id" value="{{.ID}}">
                             <button type="submit" class="button btn-danger" style="padding: 6px 16px; font-size: 0.8em;" onclick="return confirm('Er du sikker på at du vil slette denne administratoren?')">SLETT</button>
                         </form>
-                        {{end}}
                     </div>
                 </div>
+                {{end}}
                 {{end}}
             </div>
 
