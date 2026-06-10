@@ -1156,21 +1156,12 @@ func (s *Server) handleDeleteInvitation(w http.ResponseWriter, r *http.Request) 
 }
 
 func (s *Server) handleListUsers(w http.ResponseWriter, r *http.Request) {
-	admins, err := s.auth.ListAdmins()
-	if err != nil {
-		slog.Error("Failed to list admins", "error", err)
-		http.Error(w, "Serverfeil", http.StatusInternalServerError)
-		return
-	}
-
-	s.render(w, r, "users.html", PageData{
-		Admins: admins,
-	})
+	http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 }
 
 func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1180,12 +1171,12 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	if !models.IsValidEmail(email) {
 		s.setFlash(w, "Ugyldig e-postadresse", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 	if len(password) < 6 {
 		s.setFlash(w, "Passordet må være minst 6 tegn", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1196,12 +1187,12 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	slog.Info("Admin user created", "email", email)
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 }
 
 func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1227,12 +1218,12 @@ func (s *Server) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.setFlash(w, "Brukeren ble slettet", "success")
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 }
 
 func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1243,13 +1234,13 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	if len(newPassword) < 6 {
 		s.setFlash(w, "Nytt passord må være minst 6 tegn", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
 	if newPassword != confirmPassword {
 		s.setFlash(w, "Nye passord samsvarer ikke", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1257,7 +1248,7 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	user, err := s.auth.VerifyAdmin(session.Email, currentPassword)
 	if err != nil || user == nil {
 		s.setFlash(w, "Feil nåværende passord", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
@@ -1265,12 +1256,12 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		slog.Error("Failed to update password", "error", err)
 		s.setFlash(w, "Serverfeil ved bytte av passord", "error")
-		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+		http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 		return
 	}
 
 	s.setFlash(w, "Passordet ble endret!", "success")
-	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/settings#users", http.StatusSeeOther)
 }
 
 type contextKey string
@@ -1331,6 +1322,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	admins, err := s.auth.ListAdmins()
+	if err != nil {
+		slog.Error("Failed to list admins for settings", "error", err)
+	}
+
 	s.render(w, r, "settings.html", PageData{
 		DefaultEmailTemplate: defaultTemplate,
 		GlobalSenderName:     globalSenderName,
@@ -1341,8 +1337,9 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		SMTPPass:             smtpPass,
 		SharedSenders:       sharedSenders,
 		Groups:              groups,
+		Admins:              admins,
 	})
-	}
+}
 
 func (s *Server) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1516,3 +1513,4 @@ func (s *Server) handlePreviewDefaultTemplate(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html))
 }
+
