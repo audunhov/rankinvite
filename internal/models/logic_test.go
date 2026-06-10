@@ -3,6 +3,8 @@ package models
 import (
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestDSTRaceConditionLastSpot(t *testing.T) {
@@ -118,6 +120,65 @@ func TestDSTComplexChain(t *testing.T) {
 	inv.Handle(Command{Type: CmdAccept, InviteID: inv.PersonalInvites[2].ID, Now: now.Add(30 * time.Minute)})
 	if inv.Spots != 0 || inv.Status != StatusCompleted {
 		t.Errorf("Expected 0 spots and completed status, got %d and %s", inv.Spots, inv.Status)
+	}
+}
+
+func TestDSTResendReactivation(t *testing.T) {
+	inv := NewInvitation("Reactivation Test", 1)
+	p1 := Participant{Email: "p1@test.com"}
+	inv.Strategies = append(inv.Strategies, Strategy{
+		Type:           StrategyPriorityList,
+		Participants:   []Participant{p1},
+		InviteDuration: 24 * time.Hour,
+	})
+
+	now := time.Unix(1000, 0)
+	inv.Handle(Command{Type: CmdStart, Now: now})
+	inviteID := inv.PersonalInvites[0].ID
+
+	// P1 declines
+	inv.Handle(Command{Type: CmdDecline, InviteID: inviteID, Now: now.Add(time.Hour)})
+	if inv.PersonalInvites[0].Status != StatusDeclined {
+		t.Errorf("Expected status declined, got %s", inv.PersonalInvites[0].Status)
+	}
+
+	// Reactivate via CmdResend
+	events := inv.Handle(Command{Type: CmdResend, InviteID: inviteID, Now: now.Add(2 * time.Hour), BaseURL: "http://test"})
+	if inv.PersonalInvites[0].Status != StatusPending {
+		t.Errorf("Expected status pending after reactivation, got %s", inv.PersonalInvites[0].Status)
+	}
+	if len(events) != 1 {
+		t.Errorf("Expected 1 email event, got %d", len(events))
+	}
+	expectedExpiry := now.Add(2*time.Hour + 24*time.Hour)
+	if !inv.PersonalInvites[0].ExpiresAt.Equal(expectedExpiry) {
+		t.Errorf("Expected expiry %v, got %v", expectedExpiry, inv.PersonalInvites[0].ExpiresAt)
+	}
+}
+
+func TestDSTResendNoSpots(t *testing.T) {
+	inv := NewInvitation("No Spots Test", 1)
+	inv.PersonalInvites = append(inv.PersonalInvites, PersonalInvite{
+		ID:               uuid.New(),
+		ParticipantEmail: "p1@test.com",
+		Status:           StatusAccepted,
+	})
+	inv.Spots = 0
+
+	p2InviteID := uuid.New()
+	inv.PersonalInvites = append(inv.PersonalInvites, PersonalInvite{
+		ID:               p2InviteID,
+		ParticipantEmail: "p2@test.com",
+		Status:           StatusTimedOut,
+	})
+
+	// Try to reactivate p2 when 0 spots left
+	events := inv.Handle(Command{Type: CmdResend, InviteID: p2InviteID, Now: time.Now()})
+	if len(events) != 0 {
+		t.Errorf("Expected 0 events when no spots left, got %d", len(events))
+	}
+	if inv.PersonalInvites[1].Status != StatusTimedOut {
+		t.Error("Status should remain timed_out when no spots left")
 	}
 }
 

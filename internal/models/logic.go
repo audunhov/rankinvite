@@ -351,8 +351,23 @@ func (i *Invitation) Handle(cmd Command) []Event {
 		events = append(events, InvitationClosedEvent{Reason: "Cancelled by administrator"})
 
 	case CmdResend:
-		for _, pi := range i.PersonalInvites {
+		if i.Spots <= 0 {
+			return nil
+		}
+		for idx := range i.PersonalInvites {
+			pi := &i.PersonalInvites[idx]
 			if pi.ID == cmd.InviteID {
+				// If it was timed out or declined, we reset it and deduct a spot if needed?
+				// Actually, spots are deducted when someone ACCEPTS, not when INVITED.
+				// Wait, spots = total - accepted. So inviting more doesn't deduct spots yet.
+				
+				if pi.Status == StatusTimedOut || pi.Status == StatusDeclined {
+					pi.Status = StatusPending
+					// Give 24 hours for re-activated invites
+					pi.ExpiresAt = cmd.Now.Add(24 * time.Hour)
+					pi.ReminderSent = false
+				}
+
 				events = append(events, EmailSentEvent{
 					Recipient: pi.ParticipantEmail,
 					Subject:   "Invitasjon til " + i.Title,

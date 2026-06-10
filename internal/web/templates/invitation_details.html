@@ -30,12 +30,16 @@
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         
-        .inline-input { border: none; border-bottom: 2px dashed #ccc; font-family: inherit; font-size: inherit; font-weight: inherit; padding: 2px 5px; width: auto; background: transparent; }
-        .inline-input:focus { outline: none; border-bottom-color: black; background: #fffde7; }
+        .inline-input { border: none; border-bottom: 2px dashed #ccc; font-family: inherit; font-size: inherit; font-weight: inherit; padding: 5px; width: 100%; background: transparent; transition: all 0.2s; }
+        .inline-input:focus { outline: none; border-bottom: 2px solid black; background: #fffde7; }
+        .inline-input:hover { border-bottom-color: #999; }
         
-        .title-input { font-size: 2em; font-weight: bold; width: 100%; border-bottom-width: 4px; margin-bottom: 10px; }
+        .title-input { font-size: 2.2em; font-weight: bold; border-bottom-width: 4px; margin-bottom: 20px; }
         
-        .editable-description { width: 100%; min-height: 120px; padding: 15px; border: 3px solid black; font-family: inherit; font-size: 0.9em; line-height: 1.5; background: #fffde7; margin-bottom: 10px; resize: vertical; }
+        .editable-description { width: 100%; min-height: 120px; padding: 15px; border: 3px solid black; font-family: inherit; font-size: 0.9em; line-height: 1.5; background: #fffde7; margin-top: 10px; resize: vertical; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.05); }
+
+        .control-group { margin-bottom: 20px; }
+        .control-label { font-size: 0.7em; text-transform: uppercase; font-weight: bold; color: #888; display: block; margin-bottom: 5px; }
     </style>
 </head>
 <body class="container">
@@ -66,85 +70,97 @@
 {{define "invitation_details_content"}}
     {{template "flash_messages" .}}
 
-    <header style="justify-content: space-between; margin-bottom: 20px; padding-bottom: 10px;">
+    <header style="justify-content: space-between; margin-bottom: 30px; padding-bottom: 10px;">
         <a href="/admin" class="back-link">← DASHBOARD</a>
-        <div style="display: flex; gap: 10px; align-items: center;">
-             <span class="status-badge status-{{.Invitation.Status}}">{{if eq .Invitation.Status "completed"}}FULLTEGNET{{else if eq .Invitation.Status "exhausted"}}FERDIG{{else}}{{.Invitation.Status}}{{end}}</span>
+        <div style="display: flex; gap: 15px; align-items: center;">
+             <span class="status-badge status-{{.Invitation.Status}}">{{if eq .Invitation.Status "completed"}}FULLTEGNET{{else if eq .Invitation.Status "exhausted"}}FERDIG{{else if eq .Invitation.Status "cancelled"}}AVBRUTT{{else}}{{.Invitation.Status}}{{end}}</span>
         </div>
     </header>
 
-    <form action="/admin/invitations/update" method="POST" hx-post="/admin/invitations/update" hx-target="#invitation-details-container" hx-trigger="change delay:500ms from:.auto-save, click from:#save-btn">
+    <form action="/admin/invitations/update" method="POST" hx-post="/admin/invitations/update" hx-target="#invitation-details-container" hx-trigger="change delay:800ms from:.auto-save">
         <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
         <input type="hidden" name="id" value="{{.Invitation.ID}}">
         
         <div class="row">
             <!-- LEFT: MAIN CONTROL & INFO -->
             <div class="col col-8">
-                <div style="margin-bottom: 30px;">
-                    <input type="text" name="title" value="{{.Invitation.Title}}" class="inline-input title-input auto-save" placeholder="Tittel på arrangement">
+                <div class="card" style="padding: 30px; margin-bottom: 40px; border-width: 4px;">
+                    <div class="control-group">
+                        <span class="control-label">Tittel på arrangement</span>
+                        <input type="text" name="title" value="{{.Invitation.Title}}" class="inline-input title-input auto-save" placeholder="Skriv tittel her...">
+                    </div>
                     
-                    <div style="display: flex; gap: 30px; font-size: 0.9em; color: #666; align-items: center;">
-                        <div>
-                            <strong>STED:</strong> 
-                            <input type="text" name="location" value="{{.Invitation.Location}}" class="inline-input auto-save" style="width: 200px;" placeholder="Legg til sted...">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                        <div class="control-group">
+                            <span class="control-label">Sted</span>
+                            <input type="text" name="location" value="{{.Invitation.Location}}" class="inline-input auto-save" placeholder="f.eks. Oslo, Teams...">
                         </div>
-                        <div>
-                            <strong>TID:</strong> 
-                            <input type="datetime-local" name="start_time" value="{{if not .Invitation.StartTime.IsZero}}{{.Invitation.StartTime.Format "2006-01-02T15:04"}}{{end}}" class="inline-input auto-save" style="font-size: 0.8em;">
+                        <div class="control-group">
+                            <span class="control-label">Totalt antall plasser</span>
+                            <input type="number" name="spots" value="{{add .Invitation.AcceptedCount .Invitation.Spots}}" min="1" class="inline-input auto-save" style="font-weight: bold; font-size: 1.2em;">
                         </div>
-                        <button type="submit" id="save-btn" class="button" style="padding: 4px 12px; font-size: 0.7em; background: #00ffff; display: none;">LAGRE</button>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+                        <div class="control-group">
+                            <span class="control-label">Starttidspunkt</span>
+                            <input type="datetime-local" name="start_time" value="{{if not .Invitation.StartTime.IsZero}}{{.Invitation.StartTime.Format "2006-01-02T15:04"}}{{end}}" class="inline-input auto-save">
+                        </div>
+                        <div class="control-group">
+                            <span class="control-label">Sluttidspunkt</span>
+                            <input type="datetime-local" name="end_time" value="{{if not .Invitation.EndTime.IsZero}}{{.Invitation.EndTime.Format "2006-01-02T15:04"}}{{end}}" class="inline-input auto-save">
+                        </div>
+                    </div>
+
+                    <div class="control-group" style="margin-bottom: 0;">
+                        <span class="control-label">Beskrivelse (offentlig tekst)</span>
+                        <textarea name="description" class="editable-description auto-save" placeholder="Skriv en god invitasjonstekst som deltakerne ser...">{{.Invitation.Description}}</textarea>
+                    </div>
+                    <div style="text-align: right; margin-top: 10px;">
+                        <small style="color: #aaa; font-style: italic;">Endringer lagres automatisk...</small>
                     </div>
                 </div>
 
                 <!-- DASHBOARD STATS -->
                 <div class="stats-grid">
-                    <div class="stat-card" style="grid-column: span 3; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 40px;">
+                    <div class="stat-card" style="grid-column: span 3; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 40px; background: #fafafa; border-width: 4px;">
                         <div style="flex: 1;">
-                            <span class="stat-label">Plasser fylt</span>
-                            <div style="display: flex; align-items: baseline; gap: 10px;">
-                                <span class="stat-value" style="font-size: 2.5em;">{{.Invitation.AcceptedCount}} /</span>
-                                <input type="number" name="spots" value="{{add .Invitation.AcceptedCount .Invitation.Spots}}" min="1" class="inline-input auto-save" style="font-size: 2.5em; width: 80px; font-weight: bold; border-bottom-width: 4px;">
-                            </div>
+                            <span class="stat-label">Svar-status på plasser</span>
+                            <span class="stat-value" style="font-size: 2.5em;">{{.Invitation.AcceptedCount}} / {{add .Invitation.AcceptedCount .Invitation.Spots}}</span>
                             <div class="progress-container" style="margin-top: 15px;">
                                 <div class="progress-bar" style="width: {{.Invitation.ProgressPercentage}}%;"></div>
                             </div>
                         </div>
-                        <div style="text-align: center; border-left: 2px solid #eee; padding-left: 40px;">
-                            <span class="stat-label">Gjenstår</span>
+                        <div style="text-align: center; border-left: 3px solid black; padding-left: 40px;">
+                            <span class="stat-label">Ledige plasser</span>
                             <span class="stat-value">{{.Invitation.Spots}}</span>
                         </div>
                     </div>
                     <div class="stat-card">
                         <span class="stat-value" style="color: #00aa00;">{{.Invitation.AcceptedCount}}</span>
-                        <span class="stat-label">Godtatt (JA)</span>
+                        <span class="stat-label">Godtatt</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-value" style="color: #ff0000;">{{.Invitation.DeclinedCount}}</span>
-                        <span class="stat-label">Avslått (NEI)</span>
+                        <span class="stat-label">Avslått</span>
                     </div>
                     <div class="stat-card">
                         <span class="stat-value" style="color: #aa6600;">{{.Invitation.PendingCount}}</span>
-                        <span class="stat-label">Venter på svar</span>
+                        <span class="stat-label">Venter</span>
                     </div>
                 </div>
 
-                <!-- DESCRIPTION BOX -->
-                <div style="margin-bottom: 30px;">
-                    <label style="font-size: 0.8em; color: #666; margin-bottom: 5px; display: block;">BESKRIVELSE (Vises til deltakerne)</label>
-                    <textarea name="description" class="editable-description auto-save" placeholder="Skriv en invitasjonstekst her...">{{.Invitation.Description}}</textarea>
-                </div>
-
                 <!-- PARTICIPANTS LIST -->
-                <h2 style="font-size: 1em; text-transform: uppercase; margin-bottom: 15px;">Deltakeroversikt</h2>
-                <div id="participant-list">
+                <h2 style="font-size: 1.2em; text-transform: uppercase; margin-bottom: 20px; border-bottom: 4px solid black; display: inline-block;">Deltakeroversikt</h2>
+                <div id="participant-list" style="margin-bottom: 50px;">
                     {{range .Invitation.PersonalInvites}}
                     <div class="participant-row status-{{.Status}}">
                         <div class="status-icon">
                             {{if eq .Status "accepted"}}✓{{else if eq .Status "declined"}}✕{{else if eq .Status "pending"}}?{{else}}!{{end}}
                         </div>
                         <div style="flex: 1;">
-                            <div style="font-weight: bold;">{{.ParticipantEmail}}</div>
-                            <div style="font-size: 0.7em; color: #666; text-transform: uppercase;">
+                            <div style="font-weight: bold; font-size: 1.1em;">{{.ParticipantEmail}}</div>
+                            <div style="font-size: 0.7em; color: #666; text-transform: uppercase; letter-spacing: 1px;">
                                 {{if eq .Status "pending"}}
                                     Svarfrist: <span data-expires="{{.ExpiresAt.Format "2006-01-02T15:04:05Z07:00"}}">{{.ExpiresAt.Format "15:04"}}</span>
                                 {{else if eq .Status "accepted"}}
@@ -162,7 +178,7 @@
                                     hx-target="closest .participant-row"
                                     hx-swap="outerHTML"
                                     hx-vals='{"csrf_token": "{{$.CSRFToken}}"}'
-                                    class="button" style="padding: 6px 12px; font-size: 0.7em;">
+                                    class="button" style="padding: 8px 16px; font-size: 0.75em; font-weight: bold;">
                                 {{if eq .Status "pending"}}PURR{{else}}REAKTIVER{{end}}
                             </button>
                             {{end}}
@@ -170,7 +186,7 @@
                     </div>
                     {{end}}
                     {{if eq (len .Invitation.PersonalInvites) 0}}
-                    <div class="card" style="text-align: center; color: #666; padding: 20px;">
+                    <div class="card" style="text-align: center; color: #666; padding: 30px; border-style: dashed; opacity: 0.6;">
                         Ingen deltakere har mottatt invitasjon ennå.
                     </div>
                     {{end}}
@@ -179,21 +195,21 @@
 
             <!-- RIGHT: PROCESS & ACTIONS -->
             <div class="col col-4">
-                <div class="card" style="padding: 20px; border-width: 4px; background: #fafafa; position: sticky; top: 20px;">
-                    <h2 style="font-size: 0.9em; text-transform: uppercase; margin-top: 0;">Kontrollpanel</h2>
+                <div class="card" style="padding: 25px; border-width: 4px; background: #fdfdfd; position: sticky; top: 20px; box-shadow: 10px 10px 0px 0px black;">
+                    <h2 style="font-size: 1em; text-transform: uppercase; margin-top: 0; border-bottom: 3px solid black; padding-bottom: 10px; margin-bottom: 20px;">Kontrollpanel</h2>
                     
-                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 30px;">
+                    <div style="display: flex; flex-direction: column; gap: 15px; margin-bottom: 40px;">
                         {{if eq .Invitation.Status "draft"}}
                             <button type="button" hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=start" 
                                     hx-target="#invitation-details-container"
                                     hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                                    class="button btn-success" style="width: 100%;">START UTSENDELSE</button>
+                                    class="button btn-success" style="width: 100%; font-size: 1.1em; padding: 15px;">START UTSENDELSE</button>
                         {{else if eq .Invitation.Status "active"}}
                             <button type="button" hx-post="/admin/invitations/action?id={{.Invitation.ID}}&action=force_next" 
                                     hx-target="#invitation-details-container"
                                     hx-confirm="Hoppe over nåværende ventetid?"
                                     hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                                    class="button btn-primary" style="width: 100%;">NESTE I KØEN</button>
+                                    class="button btn-primary" style="width: 100%; font-size: 1.1em; padding: 15px;">NESTE I KØEN</button>
                         {{end}}
                         
                         {{if or (eq .Invitation.Status "draft") (eq .Invitation.Status "active")}}
@@ -201,43 +217,43 @@
                                 hx-target="#invitation-details-container"
                                 hx-confirm="Er du sikker på at du vil avbryte HELE prosessen?"
                                 hx-vals='{"csrf_token": "{{.CSRFToken}}"}'
-                                class="button btn-danger" style="width: 100%;">AVBRYT ALT</button>
+                                class="button btn-danger" style="width: 100%; padding: 10px; font-size: 0.9em;">AVBRYT ALT</button>
                         {{end}}
                     </div>
 
-                    <h2 style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 15px; border-top: 2px solid black; padding-top: 15px;">Utsendelsesforløp</h2>
-                    <div class="timeline">
+                    <h2 style="font-size: 0.8em; text-transform: uppercase; margin-bottom: 15px; border-top: 3px solid black; padding-top: 20px;">Utsendelsesforløp</h2>
+                    <div class="timeline" style="margin-top: 10px;">
                         {{range $index, $strat := .Invitation.Strategies}}
                         {{$isCompleted := lt $index $.Invitation.CurrentStrategyIndex}}
                         {{$isActive := and (eq $index $.Invitation.CurrentStrategyIndex) (eq $.Invitation.Status "active")}}
-                        <div class="timeline-item {{if $isActive}}active{{end}} {{if $isCompleted}}completed{{end}}">
+                        <div class="timeline-item {{if $isActive}}active{{end}} {{if $isCompleted}}completed{{end}}" style="padding: 12px;">
                             <div class="timeline-dot"></div>
-                            <div style="font-weight: bold; font-size: 0.7em;">
-                                {{if eq $strat.Type "priority_list"}}PRIORITERT LISTE{{else}}FCFS{{end}}
+                            <div style="font-weight: bold; font-size: 0.75em; text-transform: uppercase;">
+                                {{if eq $strat.Type "priority_list"}}Prioritert liste{{else}}FCFS{{end}}
                             </div>
-                            <div style="font-size: 0.6em; color: #666;">
+                            <div style="font-size: 0.7em; color: #666; margin-top: 3px;">
                                 {{len $strat.Participants}} pers • 
                                 {{if eq $strat.Type "priority_list"}}{{$strat.InviteDuration}}{{else}}{{$strat.TotalDuration}}{{end}}
                             </div>
                         </div>
                         {{end}}
                         {{if eq .Invitation.Status "draft"}}
-                        <a href="/admin/invitations/{{.Invitation.ID}}/strategies/new" class="button" style="width: 100%; font-size: 0.7em; padding: 8px;">+ NYTT STEG</a>
+                        <a href="/admin/invitations/{{.Invitation.ID}}/strategies/new" class="button" style="width: 100%; font-size: 0.7em; padding: 10px; background: #eee;">+ NYTT STEG</a>
                         {{end}}
                     </div>
 
-                    <div style="margin-top: 30px; border-top: 2px solid black; padding-top: 15px;">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                            <label style="margin: 0; font-size: 0.8em;">Følgere</label>
+                    <div style="margin-top: 40px; border-top: 3px solid black; padding-top: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                            <label style="margin: 0; font-size: 0.8em; letter-spacing: 1px;">VARSLINGS-MOTTAKERE</label>
                             {{if .IsSubscribed}}
                             <button type="button" hx-post="/admin/invitations/unsubscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button" style="padding: 4px 8px; font-size: 0.6em;">AVSLUTT</button>
                             {{else}}
                             <button type="button" hx-post="/admin/invitations/subscribe?id={{.Invitation.ID}}" hx-target="#invitation-details-container" hx-vals='{"csrf_token": "{{.CSRFToken}}"}' class="button btn-success" style="padding: 4px 8px; font-size: 0.6em;">FØLG</button>
                             {{end}}
                         </div>
-                        <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
                             {{range .Invitation.Subscribers}}
-                            <span style="background: black; color: white; padding: 2px 6px; font-size: 0.6em; border: 1px solid black;">{{.}}</span>
+                            <span style="background: black; color: white; padding: 4px 10px; font-size: 0.7em; border: 1px solid black; font-weight: bold;">{{.}}</span>
                             {{end}}
                         </div>
                     </div>
