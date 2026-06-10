@@ -27,29 +27,29 @@
                 <label id="durationLabel">Svarfrist per person</label>
                 <div class="grid-2" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                     <select id="durationPresets" onchange="updateDurationFromPreset()">
-                        <option value="15">15 minutter</option>
-                        <option value="30">30 minutter</option>
                         <option value="60">1 time</option>
-                        <option value="120" selected>2 timer</option>
+                        <option value="120">2 timer</option>
                         <option value="240">4 timer</option>
                         <option value="480">8 timer</option>
                         <option value="720">12 timer</option>
-                        <option value="1440">1 dag (24t)</option>
+                        <option value="1440" selected>1 dag (24t)</option>
                         <option value="2880">2 dager (48t)</option>
+                        <option value="4320">3 dager</option>
+                        <option value="10080">1 uke</option>
                         <option value="custom">Egendefinert...</option>
                     </select>
                     <div id="customDurationGroup" style="display: none;">
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <input type="number" id="customMins" value="120" min="1" oninput="updateHiddenMins()">
+                            <input type="number" id="customMins" value="1440" min="1" oninput="updateHiddenMins()">
                             <span style="font-size: 0.8em; font-weight: bold;">MINUTTER</span>
                         </div>
                     </div>
                 </div>
-                <input type="hidden" name="duration_mins" id="duration_mins_hidden" value="120">
+                <input type="hidden" name="duration_mins" id="duration_mins_hidden" value="1440">
             </div>
 
             <div class="form-group">
-                <label>Deltakere (dra og slipp for å prioritere)</label>
+                <label id="participantsLabel">Deltakere (dra og slipp for å prioritere)</label>
                 <div id="participantList" style="margin-bottom: 24px;">
                     <!-- Participants will be added here -->
                 </div>
@@ -110,23 +110,38 @@
         }
 
         function renderList() {
+            const type = document.getElementById('strategyType').value;
             participantList.innerHTML = '';
             participants.forEach((email, index) => {
                 const item = document.createElement('div');
                 item.className = 'participant-item';
-                item.draggable = true;
-                item.innerHTML = '<span style="margin-right: 15px; font-size: 1.2em;">☰</span>' +
-                                 '<span style="font-weight: bold;">' + email + '</span>' +
-                                 '<button type="button" class="remove-btn" onclick="removeParticipant(\'' + email + '\')">Fjern</button>';
+                item.draggable = (type === 'priority_list');
                 
-                item.addEventListener('dragstart', () => item.classList.add('dragging'));
-                item.addEventListener('dragend', () => item.classList.remove('dragging'));
+                let content = '';
+                if (type === 'priority_list') {
+                    content += '<span style="margin-right: 15px; font-size: 1.2em; cursor: move;">☰</span>';
+                } else {
+                    content += '<span style="margin-right: 15px; font-size: 1.2em; opacity: 0.3;">•</span>';
+                }
+                
+                content += '<span style="font-weight: bold;">' + email + '</span>' +
+                           '<button type="button" class="remove-btn" onclick="removeParticipant(\'' + email + '\')">Fjern</button>';
+                
+                item.innerHTML = content;
+                
+                if (type === 'priority_list') {
+                    item.addEventListener('dragstart', () => item.classList.add('dragging'));
+                    item.addEventListener('dragend', () => item.classList.remove('dragging'));
+                }
                 participantList.appendChild(item);
             });
             updateJson();
         }
 
         participantList.addEventListener('dragover', e => {
+            const type = document.getElementById('strategyType').value;
+            if (type !== 'priority_list') return;
+            
             e.preventDefault();
             const draggingItem = document.querySelector('.dragging');
             const afterElement = getDragAfterElement(participantList, e.clientY);
@@ -138,6 +153,9 @@
         });
 
         participantList.addEventListener('drop', e => {
+            const type = document.getElementById('strategyType').value;
+            if (type !== 'priority_list') return;
+
             const items = [...participantList.querySelectorAll('.participant-item')];
             participants.length = 0;
             items.forEach(item => {
@@ -187,8 +205,13 @@
 
         function toggleDuration() {
             const type = document.getElementById('strategyType').value;
-            const label = document.getElementById('durationLabel');
-            label.innerText = type === 'priority_list' ? 'Svarfrist per person (minutter)' : 'Total tidsfrist for runden (minutter)';
+            const durationLabel = document.getElementById('durationLabel');
+            const participantsLabel = document.getElementById('participantsLabel');
+            
+            durationLabel.innerText = type === 'priority_list' ? 'Svarfrist per person' : 'Total tidsfrist for runden';
+            participantsLabel.innerText = type === 'priority_list' ? 'Deltakere (dra og slipp for å prioritere)' : 'Deltakere (rekkefølge har ingen betydning)';
+            
+            renderList();
         }
 
         document.getElementById('emailInput').addEventListener('keypress', e => {
