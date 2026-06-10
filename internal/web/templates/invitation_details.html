@@ -85,21 +85,31 @@
             </div>
 
             <!-- DASHBOARD STATS -->
-            <div class="stats-grid">
-                <div class="stat-card" style="grid-column: span 2;">
-                    <span class="stat-value">{{.Invitation.AcceptedCount}} / {{add .Invitation.AcceptedCount .Invitation.Spots}}</span>
-                    <span class="stat-label">Plasser fylt</span>
-                    <div class="progress-container">
-                        <div class="progress-bar" style="width: {{.Invitation.ProgressPercentage}}%;"></div>
+            <div class="stats-grid" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="stat-card" style="grid-column: span 3; text-align: left; display: flex; align-items: center; justify-content: space-between; gap: 40px;">
+                    <div style="flex: 1;">
+                        <span class="stat-label">Plasser fylt</span>
+                        <span class="stat-value" style="font-size: 2.5em;">{{.Invitation.AcceptedCount}} / {{add .Invitation.AcceptedCount .Invitation.Spots}}</span>
+                        <div class="progress-container" style="margin-top: 15px;">
+                            <div class="progress-bar" style="width: {{.Invitation.ProgressPercentage}}%;"></div>
+                        </div>
+                    </div>
+                    <div style="text-align: center; border-left: 2px solid #eee; padding-left: 40px;">
+                        <span class="stat-label">Gjenstår</span>
+                        <span class="stat-value">{{.Invitation.Spots}}</span>
                     </div>
                 </div>
                 <div class="stat-card">
                     <span class="stat-value" style="color: #00aa00;">{{.Invitation.AcceptedCount}}</span>
-                    <span class="stat-label">Godtatt</span>
+                    <span class="stat-label">Godtatt (JA)</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-value" style="color: #ff0000;">{{.Invitation.DeclinedCount}}</span>
-                    <span class="stat-label">Avslått</span>
+                    <span class="stat-label">Avslått (NEI)</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" style="color: #aa6600;">{{.Invitation.PendingCount}}</span>
+                    <span class="stat-label">Venter på svar</span>
                 </div>
             </div>
 
