@@ -28,9 +28,11 @@ type Strategy struct {
 type InvitationStatus string
 
 const (
-	StatusDraft  InvitationStatus = "draft"
-	StatusActive InvitationStatus = "active"
-	StatusClosed InvitationStatus = "closed"
+	StatusDraft     InvitationStatus = "draft"
+	StatusActive    InvitationStatus = "active"
+	StatusCompleted InvitationStatus = "completed"
+	StatusExhausted InvitationStatus = "exhausted"
+	StatusCancelled InvitationStatus = "cancelled"
 )
 
 type PersonalInviteStatus string
@@ -92,6 +94,16 @@ func (i *Invitation) AcceptedCount() int {
 	return count
 }
 
+func (i *Invitation) DeclinedCount() int {
+	count := 0
+	for _, pi := range i.PersonalInvites {
+		if pi.Status == StatusDeclined {
+			count++
+		}
+	}
+	return count
+}
+
 func (i *Invitation) PendingCount() int {
 	count := 0
 	for _, pi := range i.PersonalInvites {
@@ -100,4 +112,24 @@ func (i *Invitation) PendingCount() int {
 		}
 	}
 	return count
+}
+
+func (i *Invitation) TotalParticipantCount() int {
+	count := 0
+	for _, s := range i.Strategies {
+		count += len(s.Participants)
+	}
+	return count
+}
+
+func (i *Invitation) ProgressPercentage() int {
+	if i.Spots <= 0 {
+		return 100
+	}
+	accepted := i.AcceptedCount()
+	total := accepted + i.Spots
+	if total == 0 {
+		return 0
+	}
+	return (accepted * 100) / total
 }

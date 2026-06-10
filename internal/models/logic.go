@@ -248,7 +248,7 @@ func (i *Invitation) Handle(cmd Command) []Event {
 					})
 
 					if i.Spots == 0 {
-						i.Status = StatusClosed
+						i.Status = StatusCompleted
 						events = append(events, InvitationFullyBookedEvent{
 							InvitationID: i.ID,
 							Title:        i.Title,
@@ -342,7 +342,7 @@ func (i *Invitation) Handle(cmd Command) []Event {
 		events = append(events, i.activateCurrentStrategy(cmd.Now, cmd.BaseURL)...)
 
 	case CmdCancel:
-		i.Status = StatusClosed
+		i.Status = StatusCancelled
 		for idx := range i.PersonalInvites {
 			if i.PersonalInvites[idx].Status == StatusPending {
 				i.PersonalInvites[idx].Status = StatusTimedOut
@@ -385,7 +385,7 @@ func (i *Invitation) activateCurrentStrategy(now time.Time, baseURL string) []Ev
 		}
 
 		if !anyPending {
-			i.Status = StatusClosed
+			i.Status = StatusExhausted
 			events = append(events, DistributionPlanCompletedEvent{
 				InvitationID:   i.ID,
 				Title:          i.Title,

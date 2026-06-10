@@ -1032,6 +1032,15 @@ func (s *Server) handleAdminInvitationAction(w http.ResponseWriter, r *http.Requ
 	var cmdType models.CommandType
 	switch action {
 	case "start":
+		totalParticipants := 0
+		for _, strat := range inv.Strategies {
+			totalParticipants += len(strat.Participants)
+		}
+		if totalParticipants == 0 {
+			s.setFlash(w, "Kan ikke starte uten deltakere i strategiene!", "error")
+			http.Redirect(w, r, "/admin/invitations/"+idStr, http.StatusSeeOther)
+			return
+		}
 		cmdType = models.CmdStart
 	case "cancel":
 		cmdType = models.CmdCancel
