@@ -223,6 +223,7 @@ type PageData struct {
 	IsSubscribed         bool
 	IsAdminEmailAllowed  bool
 	AllowedDomain        string
+	Groups               map[string][]string
 	Error                string
 	FlashMessage         string
 	FlashType            string // "success" or "error"
@@ -275,8 +276,8 @@ func (s *Server) handlePostSetup(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	if name == "" || email == "" || len(password) < 6 {
-		s.setFlash(w, "Vennligst fyll ut alle felt korrekt. Passord må være minst 6 tegn.", "error")
+	if name == "" || !models.IsValidEmail(email) || len(password) < 6 {
+		s.setFlash(w, "Vennligst fyll ut alle felt korrekt. Passord må være minst 6 tegn, og e-post må være gyldig.", "error")
 		http.Redirect(w, r, "/setup", http.StatusSeeOther)
 		return
 	}
@@ -885,9 +886,16 @@ func (s *Server) handleNewStrategy(w http.ResponseWriter, r *http.Request, idStr
 		slog.Error("Failed to get unique emails", "error", err)
 	}
 
+	groupsJSON, _ := s.repo.GetSetting("groups")
+	var groups map[string][]string
+	if groupsJSON != "" {
+		json.Unmarshal([]byte(groupsJSON), &groups)
+	}
+
 	s.render(w, r, "new_strategy.html", PageData{
 		Invitation: inv,
-		PastEmails:  pastEmails,
+		PastEmails: pastEmails,
+		Groups:     groups,
 	})
 }
 
@@ -930,6 +938,11 @@ func (s *Server) handleCreateStrategy(w http.ResponseWriter, r *http.Request) {
 	
 	var modelParticipants []models.Participant
 	for _, p := range participants {
+		if !models.IsValidEmail(p) {
+			s.setFlash(w, fmt.Sprintf("Ugyldig e-postadresse: %s", p), "error")
+			http.Redirect(w, r, fmt.Sprintf("/admin/invitations/%s/strategies/new", idStr), http.StatusSeeOther)
+			return
+		}
 		modelParticipants = append(modelParticipants, models.Participant{Email: p})
 	}
 	
@@ -1165,7 +1178,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	name := r.FormValue("name")
 	password := r.FormValue("password")
 
-	if email == "" || !strings.Contains(email, "@") {
+	if !models.IsValidEmail(email) {
 		s.setFlash(w, "Ugyldig e-postadresse", "error")
 		http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 		return
@@ -1309,6 +1322,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	smtpUser, _ := s.repo.GetSetting("smtp_user")
 	smtpPass, _ := s.repo.GetSetting("smtp_pass")
 	sharedSenders, _ := s.repo.GetSetting("shared_senders")
+	groupsJSON, _ := s.repo.GetSetting("groups")
+
+	var groups map[string][]string
+	if groupsJSON != "" {
+		if err := json.Unmarshal([]byte(groupsJSON), &groups); err != nil {
+			slog.Error("Failed to parse groups JSON", "error", err)
+		}
+	}
 
 	s.render(w, r, "settings.html", PageData{
 		DefaultEmailTemplate: defaultTemplate,
@@ -1318,9 +1339,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		SMTPPort:             smtpPort,
 		SMTPUser:             smtpUser,
 		SMTPPass:             smtpPass,
-		SharedSenders:        sharedSenders,
+		SharedSenders:       sharedSenders,
+		Groups:              groups,
 	})
-}
+	}
 
 func (s *Server) handleUnsubscribe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -1393,6 +1415,12 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	globalSenderEmail := r.FormValue("global_sender_email")
 	sharedSenders := r.FormValue("shared_senders")
 
+	if !models.IsValidEmail(globalSenderEmail) {
+		s.setFlash(w, "Ugyldig global avsender-adresse", "error")
+		http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+		return
+	}
+
 	// Extract domain
 	allowedDomain := ""
 	if idx := strings.Index(globalSenderEmail, "@"); idx != -1 {
@@ -1413,6 +1441,12 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 				email = line[idx+1 : len(line)-1]
 			}
 			
+			if !models.IsValidEmail(email) {
+				s.setFlash(w, fmt.Sprintf("Ugyldig e-postadresse i delt avsender: '%s'", email), "error")
+				http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+				return
+			}
+
 			if !strings.HasSuffix(email, "@"+allowedDomain) {
 				s.setFlash(w, fmt.Sprintf("Ugyldig delt avsender: '%s' må tilhøre domenet %s", email, allowedDomain), "error")
 				http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
@@ -1429,6 +1463,36 @@ func (s *Server) handleUpdateSettings(w http.ResponseWriter, r *http.Request) {
 	s.repo.UpdateSetting("smtp_user", r.FormValue("smtp_user"))
 	s.repo.UpdateSetting("smtp_pass", r.FormValue("smtp_pass"))
 	s.repo.UpdateSetting("shared_senders", sharedSenders)
+
+	// Save groups
+	groupNames := r.PostForm["group_names[]"]
+	groupMembers := r.PostForm["group_members[]"]
+	groups := make(map[string][]string)
+
+	for i, name := range groupNames {
+		name = strings.TrimSpace(name)
+		if name == "" || i >= len(groupMembers) {
+			continue
+		}
+		var members []string
+		for _, line := range strings.Split(groupMembers[i], "\n") {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" {
+				continue
+			}
+			if !models.IsValidEmail(trimmed) {
+				s.setFlash(w, fmt.Sprintf("Ugyldig e-post i gruppe '%s': %s", name, trimmed), "error")
+				http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)
+				return
+			}
+			members = append(members, trimmed)
+		}
+		if len(members) > 0 {
+			groups[name] = members
+		}
+	}
+	groupsData, _ := json.Marshal(groups)
+	s.repo.UpdateSetting("groups", string(groupsData))
 
 	s.setFlash(w, "Innstillingene ble lagret!", "success")
 	http.Redirect(w, r, "/admin/settings", http.StatusSeeOther)

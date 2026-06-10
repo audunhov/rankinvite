@@ -55,8 +55,9 @@
                 </div>
                 
                 <div style="display: flex; gap: 20px;">
-                    <input type="email" id="emailInput" list="pastEmails" placeholder="E-postadresse">
+                    <input type="text" id="emailInput" list="pastEmails" placeholder="E-postadresse eller gruppe">
                     <datalist id="pastEmails">
+                        {{range $name, $members := .Groups}}<option value="{{$name}}">{{end}}
                         {{range .PastEmails}}<option value="{{.}}">{{end}}
                     </datalist>
                     <button type="button" class="button" onclick="addParticipant()">LEGG TIL</button>
@@ -69,15 +70,32 @@
     </div>
 
     <script>
+        const serverGroups = {
+            {{range $name, $members := .Groups}}
+            "{{$name}}": [{{range $i, $member := $members}}{{if $i}}, {{end}}"{{$member}}"{{end}}],
+            {{end}}
+        };
+
         const participantList = document.getElementById('participantList');
         const participants = [];
 
         function addParticipant() {
             const input = document.getElementById('emailInput');
-            const email = input.value.trim();
-            if (!email || participants.includes(email)) return;
+            const value = input.value.trim();
+            if (!value) return;
 
-            participants.push(email);
+            if (serverGroups[value]) {
+                serverGroups[value].forEach(email => {
+                    if (!participants.includes(email)) {
+                        participants.push(email);
+                    }
+                });
+            } else {
+                if (!participants.includes(value)) {
+                    participants.push(value);
+                }
+            }
+
             renderList();
             input.value = '';
             input.focus();

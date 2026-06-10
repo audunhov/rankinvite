@@ -57,6 +57,26 @@
                 <textarea name="shared_senders" rows="4" placeholder="Navn <epost@domene.no>">{{.SharedSenders}}</textarea>
             </div>
 
+            <h2 style="margin-top: 40px;">Grupper</h2>
+            <p style="margin-bottom: 20px; font-size: 0.9em;">Lag grupper med deltakere som kan legges til samtidig. Én e-post per linje.</p>
+            <div id="groups-container">
+                {{range $name, $members := .Groups}}
+                <div class="card group-card" style="margin-bottom: 20px; border: 1px solid #eee; padding: 20px; background: #fafafa;">
+                    <div class="form-group">
+                        <label>Gruppenavn</label>
+                        <input type="text" name="group_names[]" value="{{$name}}" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Medlemmer</label>
+                        <textarea name="group_members[]" rows="4">{{range $members}}{{.}}
+{{end}}</textarea>
+                    </div>
+                    <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.parentElement.remove()">FJERN GRUPPE</button>
+                </div>
+                {{end}}
+            </div>
+            <button type="button" class="button" onclick="addGroup()" style="margin-bottom: 40px;">+ LEGG TIL GRUPPE</button>
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin: 40px 0 20px 0; border-top: 3px solid black; padding-top: 40px;">
                 <h2 style="margin: 0;">Standard e-postmal</h2>
                 <a href="/admin/settings/preview" target="_blank" class="button" style="padding: 8px 16px; font-size: 0.8em;">FORHÅNDSVIS</a>
@@ -71,5 +91,26 @@
             <button type="submit" class="button btn-primary" style="width: 100%; margin-top: 20px; font-size: 1.2em;">LAGRE ALLE INNSTILLINGER</button>
         </form>
     </div>
+
+    <script>
+        function addGroup() {
+            const container = document.getElementById('groups-container');
+            const groupDiv = document.createElement('div');
+            groupDiv.className = 'card group-card';
+            groupDiv.style = 'margin-bottom: 20px; border: 1px solid #eee; padding: 20px; background: #fafafa;';
+            groupDiv.innerHTML = `
+                <div class="form-group">
+                    <label>Gruppenavn</label>
+                    <input type="text" name="group_names[]" required>
+                </div>
+                <div class="form-group">
+                    <label>Medlemmer</label>
+                    <textarea name="group_members[]" rows="4" placeholder="email@example.com"></textarea>
+                </div>
+                <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.parentElement.remove()">FJERN GRUPPE</button>
+            `;
+            container.appendChild(groupDiv);
+        }
+    </script>
 </body>
 </html>
