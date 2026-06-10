@@ -95,18 +95,24 @@
                 <p style="margin-bottom: 20px; font-size: 0.9em;">Lag grupper med deltakere som kan legges til samtidig. Én e-post per linje.</p>
                 <div id="groups-container">
                     {{range $name, $members := .Groups}}
-                    <div class="card group-card" style="margin-bottom: 20px; border: 1px solid #eee; padding: 20px; background: #fafafa;">
-                        <div class="form-group">
-                            <label>Gruppenavn</label>
-                            <input type="text" name="group_names[]" value="{{$name}}" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Medlemmer</label>
-                            <textarea name="group_members[]" rows="4">{{range $members}}{{.}}
+                    <details class="group-details" style="margin-bottom: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black;">
+                        <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; background: #fafafa; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                            <span>GRUPPE: {{$name}}</span>
+                            <span style="font-size: 0.8em; border: 2px solid black; padding: 2px 8px; background: white;">{{len $members}} MEDLEMMER</span>
+                        </summary>
+                        <div style="padding: 20px; border-top: 3px solid black; background: white;">
+                            <div class="form-group">
+                                <label>Gruppenavn</label>
+                                <input type="text" name="group_names[]" value="{{$name}}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Medlemmer</label>
+                                <textarea name="group_members[]" rows="4">{{range $members}}{{.}}
 {{end}}</textarea>
+                            </div>
+                            <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.closest('details').remove()">FJERN GRUPPE</button>
                         </div>
-                        <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.parentElement.remove()">FJERN GRUPPE</button>
-                    </div>
+                    </details>
                     {{end}}
                 </div>
                 <button type="button" class="button" onclick="addGroup()" style="margin-bottom: 40px;">+ LEGG TIL GRUPPE</button>
@@ -141,85 +147,86 @@
 
         <!-- BRUKERE TAB -->
         <div id="users" class="tab-content">
-            <div class="row">
-                <div class="col col-6">
-                    <div class="card" style="box-shadow: 4px 4px 0px 0px black; border-width: 2px;">
-                        <h2>Administratorer</h2>
-                        <table class="table" style="font-size: 0.9em;">
-                            <thead>
-                                <tr>
-                                    <th>Navn / E-post</th>
-                                    <th>Handling</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {{range .Admins}}
-                                <tr>
-                                    <td style="font-weight: bold;">
-                                        <div>{{.Name}}</div>
-                                        <div style="font-size: 0.8em; font-weight: normal; color: #666;">{{.Email}}</div>
-                                        {{if eq .Email $.CurrentEmail}} <span style="font-size: 0.7em; background: #eee; padding: 2px 6px; border: 1px solid black;">DEG</span>{{end}}
-                                    </td>
-                                    <td>
-                                        {{if ne .Email $.CurrentEmail}}
-                                        <form action="/admin/users/delete" method="POST" style="margin: 0;">
-                                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
-                                            <input type="hidden" name="id" value="{{.ID}}">
-                                            <button type="submit" class="button btn-danger" style="padding: 4px 12px; font-size: 0.7em;" onclick="return confirm('Er du sikker på at du vil slette denne administratoren?')">SLETT</button>
-                                        </form>
-                                        {{else}}
-                                        -
-                                        {{end}}
-                                    </td>
-                                </tr>
-                                {{end}}
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- DIN PROFIL SECTION -->
+            <details class="card" style="margin-bottom: 40px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; padding: 0;">
+                <summary style="padding: 20px; cursor: pointer; font-weight: bold; background: #fafafa; display: flex; justify-content: space-between; align-items: center; list-style: none;">
+                    <span>DIN PROFIL & SIKKERHET</span>
+                    <span style="font-size: 0.8em; border: 2px solid black; padding: 2px 8px; background: white;">ENDRE PASSORD</span>
+                </summary>
+                <div style="padding: 30px; border-top: 3px solid black; background: white;">
+                    <form action="/admin/users/change-password" method="POST" style="max-width: 500px;">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <div class="form-group">
+                            <label>Nåværende passord</label>
+                            <input type="password" name="current_password" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Nytt passord</label>
+                            <input type="password" name="new_password" minlength="6" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Gjenta nytt passord</label>
+                            <input type="password" name="confirm_password" minlength="6" required>
+                        </div>
+                        <button type="submit" class="button btn-primary" style="width: 100%;">OPPDATER PASSORD</button>
+                    </form>
                 </div>
+            </details>
 
-                <div class="col col-6">
-                    <div class="card" style="box-shadow: 4px 4px 0px 0px black; border-width: 2px;">
-                        <h2>Opprett ny admin</h2>
-                        <form action="/admin/users/create" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                            <div class="form-group">
-                                <label>Navn</label>
-                                <input type="text" name="name" required placeholder="Fullt navn">
-                            </div>
-                            <div class="form-group">
-                                <label>E-post</label>
-                                <input type="email" name="email" required placeholder="epost@eksempel.no">
-                            </div>
-                            <div class="form-group">
-                                <label>Passord</label>
-                                <input type="password" name="password" minlength="6" required>
-                            </div>
-                            <button type="submit" class="button btn-primary" style="width: 100%;">OPPRETT BRUKER</button>
-                        </form>
-                    </div>
-
-                    <div class="card" style="box-shadow: 4px 4px 0px 0px black; border-width: 2px;">
-                        <h2>Bytt ditt passord</h2>
-                        <form action="/admin/users/change-password" method="POST">
-                            <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
-                            <div class="form-group">
-                                <label>Nåværende passord</label>
-                                <input type="password" name="current_password" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Nytt passord</label>
-                                <input type="password" name="new_password" minlength="6" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Gjenta nytt passord</label>
-                                <input type="password" name="confirm_password" minlength="6" required>
-                            </div>
-                            <button type="submit" class="button btn-primary" style="width: 100%;">OPPDATER PASSORD</button>
-                        </form>
-                    </div>
-                </div>
+            <!-- ADMINISTRATOR LIST SECTION -->
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin: 0;">Systemadministratorer</h2>
             </div>
+            
+            <div id="admin-list" style="margin-bottom: 40px;">
+                {{range .Admins}}
+                <div class="card" style="margin-bottom: 15px; padding: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black; display: flex; justify-content: space-between; align-items: center; background: white;">
+                    <div>
+                        <div style="font-weight: bold; font-size: 1.1em; display: flex; align-items: center; gap: 10px;">
+                            {{.Name}}
+                            {{if eq .Email $.CurrentEmail}}
+                            <span style="font-size: 0.6em; background: black; color: white; padding: 2px 8px; border: 1px solid black;">DEG</span>
+                            {{end}}
+                        </div>
+                        <div style="color: #666; font-size: 0.9em;">{{.Email}}</div>
+                    </div>
+                    <div>
+                        {{if ne .Email $.CurrentEmail}}
+                        <form action="/admin/users/delete" method="POST" style="margin: 0;">
+                            <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+                            <input type="hidden" name="id" value="{{.ID}}">
+                            <button type="submit" class="button btn-danger" style="padding: 6px 16px; font-size: 0.8em;" onclick="return confirm('Er du sikker på at du vil slette denne administratoren?')">SLETT</button>
+                        </form>
+                        {{end}}
+                    </div>
+                </div>
+                {{end}}
+            </div>
+
+            <!-- CREATE NEW ADMIN SECTION -->
+            <details class="card" style="border: 3px solid black; box-shadow: 4px 4px 0px 0px black; padding: 0;">
+                <summary style="padding: 20px; cursor: pointer; font-weight: bold; background: #00ffff; display: flex; justify-content: space-between; align-items: center; list-style: none; border-bottom: 3px solid black;">
+                    <span>+ LEGG TIL NY ADMINISTRATOR</span>
+                </summary>
+                <div style="padding: 30px; background: white;">
+                    <form action="/admin/users/create" method="POST" style="max-width: 500px;">
+                        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+                        <div class="form-group">
+                            <label>Navn</label>
+                            <input type="text" name="name" required placeholder="Fullt navn">
+                        </div>
+                        <div class="form-group">
+                            <label>E-post</label>
+                            <input type="email" name="email" required placeholder="epost@eksempel.no">
+                        </div>
+                        <div class="form-group">
+                            <label>Passord</label>
+                            <input type="password" name="password" minlength="6" required>
+                        </div>
+                        <button type="submit" class="button btn-primary" style="width: 100%;">OPPRETT BRUKER</button>
+                    </form>
+                </div>
+            </details>
         </div>
     </div>
 
@@ -253,21 +260,28 @@
 
         function addGroup() {
             const container = document.getElementById('groups-container');
-            const groupDiv = document.createElement('div');
-            groupDiv.className = 'card group-card';
-            groupDiv.style = 'margin-bottom: 20px; border: 1px solid #eee; padding: 20px; background: #fafafa;';
-            groupDiv.innerHTML = `
-                <div class="form-group">
-                    <label>Gruppenavn</label>
-                    <input type="text" name="group_names[]" required>
+            const details = document.createElement('details');
+            details.className = 'group-details';
+            details.open = true;
+            details.style = 'margin-bottom: 20px; border: 3px solid black; box-shadow: 4px 4px 0px 0px black;';
+            details.innerHTML = `
+                <summary style="padding: 15px 20px; cursor: pointer; font-weight: bold; background: #fafafa; list-style: none; display: flex; justify-content: space-between; align-items: center;">
+                    <span>NY GRUPPE</span>
+                    <span style="font-size: 0.8em; border: 2px solid black; padding: 2px 8px; background: white;">NY</span>
+                </summary>
+                <div style="padding: 20px; border-top: 3px solid black; background: white;">
+                    <div class="form-group">
+                        <label>Gruppenavn</label>
+                        <input type="text" name="group_names[]" placeholder="f.eks. Styret" required oninput="this.closest('details').querySelector('summary span').textContent = 'GRUPPE: ' + (this.value || 'NY GRUPPE')">
+                    </div>
+                    <div class="form-group">
+                        <label>Medlemmer</label>
+                        <textarea name="group_members[]" rows="4" placeholder="email@example.com"></textarea>
+                    </div>
+                    <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.closest('details').remove()">FJERN GRUPPE</button>
                 </div>
-                <div class="form-group">
-                    <label>Medlemmer</label>
-                    <textarea name="group_members[]" rows="4" placeholder="email@example.com"></textarea>
-                </div>
-                <button type="button" class="button" style="background: #ff4444; color: white;" onclick="this.parentElement.remove()">FJERN GRUPPE</button>
             `;
-            container.appendChild(groupDiv);
+            container.appendChild(details);
         }
     </script>
 </body>
