@@ -1093,6 +1093,12 @@ func (s *Server) handleResendEmail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if targetInv.Spots <= 0 {
+		s.setFlash(w, "Ingen ledige plasser igjen!", "error")
+		http.Redirect(w, r, "/admin/invitations/"+targetInv.ID.String(), http.StatusSeeOther)
+		return
+	}
+
 	events := targetInv.Handle(models.Command{
 		Type:     models.CmdResend,
 		InviteID: inviteID,
