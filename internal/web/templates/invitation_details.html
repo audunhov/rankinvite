@@ -30,11 +30,12 @@
         
         @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
         
-        .inline-input { border: none; font-family: inherit; font-size: inherit; font-weight: inherit; padding: 5px; width: 100%; background: transparent; }
-        .inline-input:focus { outline: none; border-bottom: 2px solid black; background: #fffde7; }
-        .inline-input:hover { border-bottom-color: #999; }
+        .inline-input { border: none; border-bottom: 2px solid transparent; font-family: inherit; font-size: inherit; font-weight: inherit; padding: 5px; width: 100%; background: transparent; }
+        .inline-input:focus { outline: none; border-bottom-color: black; background: #fffde7; }
+        .inline-input:hover { border-bottom-color: #eee; }
         
-        .title-input { font-size: 2.2em; font-weight: bold; border-bottom-width: 4px; margin-bottom: 20px; }
+        .title-input { font-size: 2.2em; font-weight: bold; border-bottom: 4px solid transparent; margin-bottom: 20px; }
+        .title-input:focus { border-bottom-color: black; }
         
         .editable-description { width: 100%; min-height: 120px; padding: 15px; border: 3px solid black; font-family: inherit; font-size: 0.9em; line-height: 1.5; background: #fffde7; margin-top: 10px; resize: vertical; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.05); }
 
