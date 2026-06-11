@@ -41,6 +41,18 @@
 
         .control-group { margin-bottom: 20px; }
         .control-label { font-size: 0.7em; text-transform: uppercase; font-weight: bold; color: #888; display: block; margin-bottom: 5px; }
+
+        @media (max-width: 768px) {
+            .stats-grid { grid-template-columns: 1fr !important; }
+            .stat-card { grid-column: span 1 !important; }
+            .stat-card:first-child { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .stat-card:first-child div:last-child { border-left: none; padding-left: 0; border-top: 1px solid #eee; padding-top: 10px; width: 100%; text-align: left; }
+            .title-input { font-size: 1.5em; }
+            .action-bar { flex-direction: column; gap: 15px; align-items: stretch; position: relative; box-shadow: 4px 4px 0px 0px black; }
+            .row { flex-direction: column; }
+            .col-4 { order: -1; margin-bottom: 30px; } /* Show control panel first on mobile */
+            .col-4 .card { position: static; }
+        }
     </style>
 </head>
 <body class="container">
